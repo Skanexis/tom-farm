@@ -122,7 +122,7 @@ export function ShopPage({ products, onAddToCart, onQuickView }: ShopPageProps) 
                   </button>
                 </div>
               ) : (
-                <motion.div layout className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <motion.div layout className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-3">
                   <AnimatePresence mode="popLayout">
                     {filtered.map((product) => (
                       <motion.div

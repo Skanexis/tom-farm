@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { Header } from "./components/Header";
@@ -30,16 +30,6 @@ export interface ContactItem {
   accent: string;
 }
 
-interface TelegramLoginUser {
-  id: number | string;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  photo_url?: string;
-  auth_date?: number;
-  hash?: string;
-}
-
 declare global {
   interface Window {
     Telegram?: {
@@ -47,7 +37,6 @@ declare global {
         initData?: string;
       };
     };
-    onTelegramAuth?: (user: TelegramLoginUser) => void;
   }
 }
 
@@ -60,69 +49,93 @@ function TelegramLoginModal({
   onLogin: (user: AppUser) => void;
 }) {
   const [loading, setLoading] = useState(false);
-  const [botUsername, setBotUsername] = useState("");
   const [loginError, setLoginError] = useState("");
-  const widgetRef = useRef<HTMLDivElement>(null);
+  const [startUrl, setStartUrl] = useState("");
+  const [botUsername, setBotUsername] = useState("");
+  const [statusText, setStatusText] = useState("Preparazione accesso...");
 
-  const authenticate = useCallback(async (payload: Record<string, unknown>) => {
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const startLogin = async () => {
+      setLoading(true);
+      setLoginError("");
+      try {
+        const telegramInitData = window.Telegram?.WebApp?.initData;
+        if (telegramInitData) {
+          const response = await fetch("/api/auth/telegram", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ initData: telegramInitData }),
+          });
+          if (!response.ok) throw new Error("Telegram auth failed");
+          const user = await response.json();
+          if (!cancelled) {
+            onLogin(user);
+            onClose();
+          }
+          return;
+        }
+
+        const response = await fetch("/api/auth/telegram/start-session", { method: "POST" });
+        if (!response.ok) throw new Error("Telegram session failed");
+        const session = await response.json();
+        if (cancelled) return;
+        setStartUrl(session.startUrl);
+        setBotUsername(session.botUsername);
+        setStatusText("Откройте бота и нажмите Start");
+        setLoading(false);
+
+        intervalId = setInterval(async () => {
+          try {
+            const pollResponse = await fetch(`/api/auth/telegram/session/${session.sessionId}`);
+            if (!pollResponse.ok) throw new Error("Session expired");
+            const poll = await pollResponse.json();
+            if (poll.status === "authorized") {
+              if (intervalId) clearInterval(intervalId);
+              onLogin(poll.user);
+              onClose();
+            }
+          } catch {
+            if (intervalId) clearInterval(intervalId);
+            setLoginError("Сессия входа устарела. Закройте окно и попробуйте еще раз.");
+          }
+        }, 1500);
+      } catch {
+        setLoading(false);
+        setStatusText("");
+        setLoginError("Telegram bot non configurato");
+      }
+    };
+
+    startLogin();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [onClose, onLogin]);
+
+  const devLogin = async () => {
     setLoading(true);
     setLoginError("");
     try {
       const response = await fetch("/api/auth/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ devUser: { id: "123456789", first_name: "Admin", username: "tomfarm_admin" } }),
       });
       if (!response.ok) throw new Error("Telegram auth failed");
       const user = await response.json();
       onLogin(user);
-      setLoading(false);
       onClose();
     } catch {
-      setLoginError("Accesso Telegram non riuscito");
+      setLoginError("Accesso dev non riuscito");
+    } finally {
       setLoading(false);
     }
-  }, [onClose, onLogin]);
-
-  useEffect(() => {
-    fetch("/api/config")
-      .then((response) => response.json())
-      .then((config) => setBotUsername(String(config.telegramBotUsername ?? "").replace(/^@/, "")))
-      .catch(() => setBotUsername(""));
-  }, []);
-
-  useEffect(() => {
-    window.onTelegramAuth = (loginData) => authenticate({ loginData });
-    return () => {
-      delete window.onTelegramAuth;
-    };
-  }, [authenticate]);
-
-  useEffect(() => {
-    if (!botUsername || window.Telegram?.WebApp?.initData || !widgetRef.current) return;
-
-    widgetRef.current.innerHTML = "";
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = "https://telegram.org/js/telegram-widget.js?22";
-    script.setAttribute("data-telegram-login", botUsername);
-    script.setAttribute("data-size", "large");
-    script.setAttribute("data-radius", "14");
-    script.setAttribute("data-request-access", "write");
-    script.setAttribute("data-onauth", "window.onTelegramAuth(user)");
-    widgetRef.current.appendChild(script);
-  }, [botUsername]);
-
-  const handleTelegramClick = () => {
-    const telegramInitData = window.Telegram?.WebApp?.initData;
-    authenticate(
-      telegramInitData
-        ? { initData: telegramInitData }
-        : { devUser: { id: "123456789", first_name: "Admin", username: "tomfarm_admin" } }
-    );
   };
-
-  const hasTelegramWidget = Boolean(botUsername && !window.Telegram?.WebApp?.initData);
 
   return (
     <AnimatePresence>
@@ -154,16 +167,23 @@ function TelegramLoginModal({
             </svg>
           </div>
 
-          <h2 className="text-white font-black text-2xl mb-2">Accedi con Telegram</h2>
-          <p className="text-[#A1A1AA] text-sm mb-8 leading-relaxed">
-            Collega il tuo account Telegram per accedere a ordini, profilo e offerte riservate.
+          <h2 className="text-white font-black text-2xl mb-2">Вход через Telegram</h2>
+          <p className="text-[#A1A1AA] text-sm mb-6 leading-relaxed">
+            Нажмите кнопку, отправьте боту /start и вернитесь на сайт.
           </p>
 
-          {hasTelegramWidget ? (
-            <div className="flex min-h-12 items-center justify-center" ref={widgetRef} />
+          {startUrl ? (
+            <a
+              href={startUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#229ED9] py-4 font-bold text-white transition-all hover:bg-[#1d8bbf]"
+            >
+              Открыть @{botUsername}
+            </a>
           ) : (
             <button
-              onClick={handleTelegramClick}
+              onClick={devLogin}
               disabled={loading}
               className="w-full flex items-center justify-center gap-3 py-4 bg-[#229ED9] hover:bg-[#1d8bbf] disabled:opacity-70 rounded-2xl text-white font-bold transition-all"
             >
@@ -180,12 +200,13 @@ function TelegramLoginModal({
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                   </svg>
-                  Continua con Telegram
+                  Dev login
                 </>
               )}
             </button>
           )}
 
+          {statusText && <p className="mt-4 text-xs font-bold text-[#9DEBFF]">{statusText}</p>}
           {loginError && <p className="mt-3 text-xs font-bold text-[#F4C95D]">{loginError}</p>}
 
           <p className="text-[#A1A1AA] text-xs mt-4">
@@ -321,6 +342,11 @@ export default function App() {
   }, []);
 
   const handleCheckout = () => {
+    if (!user) {
+      setLoginOpen(true);
+      return;
+    }
+
     setCartOpen(false);
     setCart([]);
     setCheckoutSuccess(true);

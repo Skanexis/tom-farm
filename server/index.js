@@ -16,6 +16,10 @@ const contactsSeedPath = path.join(dataDir, "initial-contacts.json");
 const uploadsDir = path.join(rootDir, "uploads");
 const distDir = path.join(rootDir, "dist");
 const port = Number(process.env.PORT ?? 3001);
+const authSessions = new Map();
+const sessionByCode = new Map();
+let telegramPollingOffset = 0;
+let telegramPollingActive = false;
 
 const app = express();
 app.use(cors());
@@ -57,6 +61,28 @@ function publicUser(user) {
     photoUrl: user.photoUrl,
     isAdmin: user.isAdmin,
   };
+}
+
+async function upsertTelegramUser(telegramUser) {
+  const db = await readDb();
+  const id = String(telegramUser.id);
+  const name = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ") || telegramUser.username || `User ${id}`;
+  const existing = db.users.find((user) => String(user.id) === id);
+  const ids = await readAdminIds();
+  const user = {
+    id,
+    name,
+    username: telegramUser.username ?? existing?.username ?? "",
+    photoUrl: telegramUser.photo_url ?? existing?.photoUrl ?? "",
+    isAdmin: ids.includes(id) || existing?.isAdmin || false,
+    updatedAt: new Date().toISOString(),
+    createdAt: existing?.createdAt ?? new Date().toISOString(),
+  };
+
+  if (existing) Object.assign(existing, user);
+  else db.users.push(user);
+  await writeDb(db);
+  return user;
 }
 
 async function readAdminIds() {
@@ -161,6 +187,102 @@ function normalizeContact(input, existing = {}) {
   };
 }
 
+function cleanupAuthSessions() {
+  const now = Date.now();
+  for (const [sessionId, session] of authSessions.entries()) {
+    if (session.expiresAt <= now) {
+      authSessions.delete(sessionId);
+      sessionByCode.delete(session.code);
+    }
+  }
+}
+
+async function telegramApi(method, body = {}) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return null;
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json();
+  if (!data.ok) throw new Error(data.description || `Telegram ${method} failed`);
+  return data.result;
+}
+
+async function sendTelegramMessage(chatId, text) {
+  try {
+    await telegramApi("sendMessage", { chat_id: chatId, text });
+  } catch (error) {
+    console.warn("Telegram sendMessage failed:", error.message);
+  }
+}
+
+async function handleTelegramStart(from, chatId, payload) {
+  if (!from?.id) return;
+
+  if (!payload?.startsWith("login_")) {
+    await sendTelegramMessage(chatId, "Откройте вход на сайте Tom Farm и нажмите кнопку Telegram.");
+    return;
+  }
+
+  cleanupAuthSessions();
+  const code = payload.slice("login_".length);
+  const sessionId = sessionByCode.get(code);
+  const session = sessionId ? authSessions.get(sessionId) : null;
+  if (!session) {
+    await sendTelegramMessage(chatId, "Ссылка входа устарела. Откройте вход на сайте еще раз.");
+    return;
+  }
+
+  const user = await upsertTelegramUser(from);
+  session.user = publicUser(user);
+  authSessions.set(sessionId, session);
+  await sendTelegramMessage(chatId, "Готово. Вернитесь на сайт Tom Farm, вход уже подтвержден.");
+}
+
+async function processTelegramUpdate(update) {
+  const message = update.message;
+  const text = message?.text ?? "";
+  if (!message?.from || !text.startsWith("/start")) return;
+
+  const [, payload = ""] = text.trim().split(/\s+/, 2);
+  await handleTelegramStart(message.from, message.chat.id, payload);
+}
+
+async function pollTelegramUpdates() {
+  if (telegramPollingActive || !process.env.TELEGRAM_BOT_TOKEN) return;
+  telegramPollingActive = true;
+  try {
+    const updates = await telegramApi("getUpdates", {
+      offset: telegramPollingOffset ? telegramPollingOffset + 1 : undefined,
+      timeout: 0,
+      allowed_updates: ["message"],
+    });
+
+    for (const update of updates ?? []) {
+      telegramPollingOffset = Math.max(telegramPollingOffset, Number(update.update_id));
+      await processTelegramUpdate(update);
+    }
+  } catch (error) {
+    console.warn("Telegram polling failed:", error.message);
+  } finally {
+    telegramPollingActive = false;
+  }
+}
+
+async function startTelegramPolling() {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return;
+  try {
+    await telegramApi("deleteWebhook", { drop_pending_updates: false });
+  } catch (error) {
+    console.warn("Telegram deleteWebhook failed:", error.message);
+  }
+  pollTelegramUpdates();
+  setInterval(pollTelegramUpdates, 1800);
+}
+
 const storage = multer.diskStorage({
   destination: async (_req, _file, cb) => {
     await fs.mkdir(uploadsDir, { recursive: true });
@@ -187,6 +309,35 @@ app.get("/api/config", (_req, res) => {
   res.json({
     telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "",
   });
+});
+
+app.post("/api/auth/telegram/start-session", (_req, res) => {
+  const botUsername = String(process.env.TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "");
+  if (!process.env.TELEGRAM_BOT_TOKEN || !botUsername) {
+    return res.status(503).json({ error: "Telegram bot is not configured" });
+  }
+
+  cleanupAuthSessions();
+  const sessionId = crypto.randomUUID();
+  const code = crypto.randomBytes(8).toString("hex");
+  const expiresAt = Date.now() + 5 * 60 * 1000;
+  authSessions.set(sessionId, { code, expiresAt, user: null });
+  sessionByCode.set(code, sessionId);
+
+  res.json({
+    sessionId,
+    expiresAt,
+    botUsername,
+    startUrl: `https://t.me/${botUsername}?start=login_${code}`,
+  });
+});
+
+app.get("/api/auth/telegram/session/:id", (req, res) => {
+  cleanupAuthSessions();
+  const session = authSessions.get(req.params.id);
+  if (!session) return res.status(404).json({ status: "expired" });
+  if (session.user) return res.json({ status: "authorized", user: session.user });
+  res.json({ status: "pending", expiresAt: session.expiresAt });
 });
 
 app.get("/api/products", async (_req, res) => {
@@ -273,27 +424,10 @@ app.post("/api/auth/telegram", async (req, res) => {
 
   if (initData && botToken) telegramUser = verifyTelegramInitData(initData, botToken);
   if (!telegramUser && loginData && botToken) telegramUser = verifyTelegramLoginData(loginData, botToken);
-  if (!telegramUser && !botToken && devUser) telegramUser = devUser;
+  if (!telegramUser && !botToken && process.env.NODE_ENV !== "production" && devUser) telegramUser = devUser;
   if (!telegramUser) return res.status(401).json({ error: "Autenticazione Telegram non riuscita" });
 
-  const db = await readDb();
-  const id = String(telegramUser.id);
-  const name = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ") || telegramUser.username || `User ${id}`;
-  const existing = db.users.find((user) => String(user.id) === id);
-  const ids = await readAdminIds();
-  const user = {
-    id,
-    name,
-    username: telegramUser.username ?? existing?.username ?? "",
-    photoUrl: telegramUser.photo_url ?? existing?.photoUrl ?? "",
-    isAdmin: ids.includes(id) || existing?.isAdmin || false,
-    updatedAt: new Date().toISOString(),
-    createdAt: existing?.createdAt ?? new Date().toISOString(),
-  };
-
-  if (existing) Object.assign(existing, user);
-  else db.users.push(user);
-  await writeDb(db);
+  const user = await upsertTelegramUser(telegramUser);
   res.json(publicUser(user));
 });
 
@@ -315,6 +449,7 @@ app.get(/^(?!\/api(?:\/|$)).*/, async (_req, res, next) => {
 });
 
 await ensureDb();
+startTelegramPolling();
 app.listen(port, () => {
   console.log(`API listening on http://127.0.0.1:${port}`);
 });
