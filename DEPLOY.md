@@ -92,6 +92,16 @@ cd /opt/sites/tom-farm
 
 ## 5. Настройка `.env` на VPS
 
+Перед этим открой BotFather в Telegram и привяжи домен к боту:
+
+```text
+/setdomain
+выбери своего бота
+tom-farm.eu
+```
+
+Если домен не привязан в BotFather, Telegram Login Widget на сайте может не авторизовать пользователя.
+
 Создай `.env` из примера:
 
 ```bash
@@ -103,6 +113,7 @@ nano .env
 
 ```env
 TELEGRAM_BOT_TOKEN=сюда_токен_бота
+TELEGRAM_BOT_USERNAME=tomfarm_bot
 ADMIN_TELEGRAM_IDS=123456789
 PORT=3001
 TOM_FARM_HOST_PORT=3017
@@ -112,6 +123,7 @@ TOM_FARM_HOST_PORT=3017
 
 - `PORT=3001` это порт внутри контейнера, обычно не меняй.
 - `TOM_FARM_HOST_PORT=3017` это локальный порт VPS. Если он занят другим проектом, поставь другой, например `3018`.
+- `TELEGRAM_BOT_USERNAME` это username бота без `@`. Он нужен для входа через Telegram на обычном сайте.
 
 Проверить, занят ли порт:
 

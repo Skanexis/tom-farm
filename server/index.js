@@ -95,10 +95,33 @@ function verifyTelegramInitData(initData, botToken) {
 
   const secret = crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
   const calculated = crypto.createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  if (calculated.length !== hash.length) return null;
   if (!crypto.timingSafeEqual(Buffer.from(calculated), Buffer.from(hash))) return null;
 
   const userRaw = params.get("user");
   return userRaw ? JSON.parse(userRaw) : null;
+}
+
+function verifyTelegramLoginData(loginData, botToken) {
+  const { hash, ...data } = loginData ?? {};
+  if (!hash) return null;
+
+  const dataCheckString = Object.entries(data)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, value]) => `${key}=${value}`)
+    .join("\n");
+
+  const secret = crypto.createHash("sha256").update(botToken).digest();
+  const calculated = crypto.createHmac("sha256", secret).update(dataCheckString).digest("hex");
+  if (calculated.length !== hash.length) return null;
+  if (!crypto.timingSafeEqual(Buffer.from(calculated), Buffer.from(hash))) return null;
+
+  const authDate = Number(data.auth_date ?? 0);
+  const maxAgeSeconds = 24 * 60 * 60;
+  if (!Number.isFinite(authDate) || Date.now() / 1000 - authDate > maxAgeSeconds) return null;
+
+  return data;
 }
 
 function normalizeProduct(input, existing = {}) {
@@ -159,6 +182,12 @@ const upload = multer({
 });
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+app.get("/api/config", (_req, res) => {
+  res.json({
+    telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "",
+  });
+});
 
 app.get("/api/products", async (_req, res) => {
   const db = await readDb();
@@ -238,11 +267,12 @@ app.post("/api/products/:id/media", requireAdmin, upload.fields([{ name: "photo"
 });
 
 app.post("/api/auth/telegram", async (req, res) => {
-  const { initData, devUser } = req.body ?? {};
+  const { initData, loginData, devUser } = req.body ?? {};
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
   let telegramUser = null;
 
   if (initData && botToken) telegramUser = verifyTelegramInitData(initData, botToken);
+  if (!telegramUser && loginData && botToken) telegramUser = verifyTelegramLoginData(loginData, botToken);
   if (!telegramUser && !botToken && devUser) telegramUser = devUser;
   if (!telegramUser) return res.status(401).json({ error: "Autenticazione Telegram non riuscita" });
 

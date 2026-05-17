@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { X } from "lucide-react";
 import { Header } from "./components/Header";
@@ -30,6 +30,16 @@ export interface ContactItem {
   accent: string;
 }
 
+interface TelegramLoginUser {
+  id: number | string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  photo_url?: string;
+  auth_date?: number;
+  hash?: string;
+}
+
 declare global {
   interface Window {
     Telegram?: {
@@ -37,6 +47,7 @@ declare global {
         initData?: string;
       };
     };
+    onTelegramAuth?: (user: TelegramLoginUser) => void;
   }
 }
 
@@ -49,19 +60,18 @@ function TelegramLoginModal({
   onLogin: (user: AppUser) => void;
 }) {
   const [loading, setLoading] = useState(false);
+  const [botUsername, setBotUsername] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const widgetRef = useRef<HTMLDivElement>(null);
 
-  const mockLogin = async () => {
+  const authenticate = useCallback(async (payload: Record<string, unknown>) => {
     setLoading(true);
+    setLoginError("");
     try {
-      const telegramInitData = window.Telegram?.WebApp?.initData;
       const response = await fetch("/api/auth/telegram", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          telegramInitData
-            ? { initData: telegramInitData }
-            : { devUser: { id: "123456789", first_name: "Admin", username: "tomfarm_admin" } }
-        ),
+        body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error("Telegram auth failed");
       const user = await response.json();
@@ -69,9 +79,50 @@ function TelegramLoginModal({
       setLoading(false);
       onClose();
     } catch {
+      setLoginError("Accesso Telegram non riuscito");
       setLoading(false);
     }
+  }, [onClose, onLogin]);
+
+  useEffect(() => {
+    fetch("/api/config")
+      .then((response) => response.json())
+      .then((config) => setBotUsername(String(config.telegramBotUsername ?? "").replace(/^@/, "")))
+      .catch(() => setBotUsername(""));
+  }, []);
+
+  useEffect(() => {
+    window.onTelegramAuth = (loginData) => authenticate({ loginData });
+    return () => {
+      delete window.onTelegramAuth;
+    };
+  }, [authenticate]);
+
+  useEffect(() => {
+    if (!botUsername || window.Telegram?.WebApp?.initData || !widgetRef.current) return;
+
+    widgetRef.current.innerHTML = "";
+    const script = document.createElement("script");
+    script.async = true;
+    script.src = "https://telegram.org/js/telegram-widget.js?22";
+    script.setAttribute("data-telegram-login", botUsername);
+    script.setAttribute("data-size", "large");
+    script.setAttribute("data-radius", "14");
+    script.setAttribute("data-request-access", "write");
+    script.setAttribute("data-onauth", "window.onTelegramAuth(user)");
+    widgetRef.current.appendChild(script);
+  }, [botUsername]);
+
+  const handleTelegramClick = () => {
+    const telegramInitData = window.Telegram?.WebApp?.initData;
+    authenticate(
+      telegramInitData
+        ? { initData: telegramInitData }
+        : { devUser: { id: "123456789", first_name: "Admin", username: "tomfarm_admin" } }
+    );
   };
+
+  const hasTelegramWidget = Boolean(botUsername && !window.Telegram?.WebApp?.initData);
 
   return (
     <AnimatePresence>
@@ -108,28 +159,34 @@ function TelegramLoginModal({
             Collega il tuo account Telegram per accedere a ordini, profilo e offerte riservate.
           </p>
 
-          <button
-            onClick={mockLogin}
-            disabled={loading}
-            className="w-full flex items-center justify-center gap-3 py-4 bg-[#229ED9] hover:bg-[#1d8bbf] disabled:opacity-70 rounded-2xl text-white font-bold transition-all"
-          >
-            {loading ? (
-              <>
-                <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
-                Connessione...
-              </>
-            ) : (
-              <>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-                </svg>
-                Continua con Telegram
-              </>
-            )}
-          </button>
+          {hasTelegramWidget ? (
+            <div className="flex min-h-12 items-center justify-center" ref={widgetRef} />
+          ) : (
+            <button
+              onClick={handleTelegramClick}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-4 bg-[#229ED9] hover:bg-[#1d8bbf] disabled:opacity-70 rounded-2xl text-white font-bold transition-all"
+            >
+              {loading ? (
+                <>
+                  <svg className="animate-spin w-5 h-5" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Connessione...
+                </>
+              ) : (
+                <>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
+                  </svg>
+                  Continua con Telegram
+                </>
+              )}
+            </button>
+          )}
+
+          {loginError && <p className="mt-3 text-xs font-bold text-[#F4C95D]">{loginError}</p>}
 
           <p className="text-[#A1A1AA] text-xs mt-4">
             Continuando accetti i nostri{" "}
@@ -276,13 +333,13 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen overflow-hidden bg-[#020405] px-5 py-6"
+      className="min-h-screen overflow-hidden bg-[#020405] px-1.5 py-2 sm:px-5 sm:py-6"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(115deg,rgba(111,211,247,0.08),transparent_38%),linear-gradient(165deg,transparent_54%,rgba(244,201,93,0.08))]" />
       <div className="pointer-events-none fixed inset-0 opacity-[0.06] [background-image:linear-gradient(108deg,#6FD3F7_1px,transparent_1px)] [background-size:58px_58px]" />
 
-      <main className="app-shell relative mx-auto h-[min(760px,calc(100vh-48px))] w-full max-w-[1008px] overflow-hidden rounded-[34px] border border-[#2B5360]/55 bg-[#05080A] shadow-[0_28px_90px_rgba(0,0,0,0.62),inset_0_1px_0_rgba(255,255,255,0.07)]">
+      <main className="app-shell relative mx-auto h-[calc(100vh-16px)] w-full max-w-[1008px] overflow-hidden rounded-[24px] border border-[#2B5360]/55 bg-[#05080A] shadow-[0_28px_90px_rgba(0,0,0,0.62),inset_0_1px_0_rgba(255,255,255,0.07)] sm:h-[min(760px,calc(100vh-48px))] sm:rounded-[34px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(111,211,247,0.11),transparent_30%),linear-gradient(90deg,rgba(5,8,10,0.98),rgba(11,25,30,0.72))]" />
         <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,#6FD3F7_1px,transparent_0)] [background-size:24px_24px]" />
 
@@ -296,7 +353,7 @@ export default function App() {
           onLogout={handleLogout}
         />
 
-        <div className="relative z-10 h-full overflow-y-auto app-content-scroll">
+        <div className={`relative z-10 h-full app-content-scroll ${page === "home" ? "overflow-hidden" : "overflow-y-auto"}`}>
           {page === "home" && (
             <HomePage
               products={products}
