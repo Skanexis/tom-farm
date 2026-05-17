@@ -40,7 +40,7 @@ export function ShopPage({ products, onAddToCart, onQuickView }: ShopPageProps) 
   }, [products, search, activeCategory]);
 
   return (
-    <div className="min-h-full px-4 pb-8 pt-24 text-[#F5F7EE]">
+    <div className="min-h-full px-3 pb-6 pt-18 text-[#F5F7EE] sm:px-4 sm:pb-8 sm:pt-24">
       <div className="relative mx-auto max-w-[820px]">
         <aside className="pointer-events-none absolute -left-16 top-20 hidden h-[260px] w-12 lg:block">
           <div className="absolute left-6 top-0 h-24 w-px rotate-[72deg] bg-[#2B5360]" />
@@ -52,9 +52,9 @@ export function ShopPage({ products, onAddToCart, onQuickView }: ShopPageProps) 
           </div>
         </aside>
 
-        <section className="overflow-hidden rounded-[24px] border border-[#2B5360]/55 bg-[#0B0F12]/90 shadow-[0_22px_70px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.06)] backdrop-blur-xl">
-          <div className="relative px-5 pb-6 pt-6 sm:px-6">
-            <div className="absolute inset-0 opacity-[0.04] [background-image:linear-gradient(#D8FF7A_1px,transparent_1px)] [background-size:100%_4px]" />
+        <section className="overflow-visible sm:overflow-hidden sm:rounded-[24px] sm:border sm:border-[#2B5360]/55 sm:bg-[#0B0F12]/90 sm:shadow-[0_22px_70px_rgba(0,0,0,0.48),inset_0_1px_0_rgba(255,255,255,0.06)] sm:backdrop-blur-xl">
+          <div className="relative px-0 pb-4 pt-4 sm:px-6 sm:pb-6 sm:pt-6">
+            <div className="pointer-events-none absolute inset-0 hidden opacity-[0.04] [background-image:linear-gradient(#D8FF7A_1px,transparent_1px)] [background-size:100%_4px] sm:block" />
             <div className="relative">
               <div className="mb-5 flex items-start justify-between gap-3">
                 <div>

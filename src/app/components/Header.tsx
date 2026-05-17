@@ -39,7 +39,7 @@ export function Header({ cartCount, currentPage, onNavigate, onCartOpen, user, o
               className="h-full w-full object-cover"
             />
           </div>
-          <span className="hidden text-xl font-black tracking-[0.18em] text-[#D8FF7A] sm:inline">T.F</span>
+          <span className="text-sm font-black tracking-[0.06em] text-[#D8FF7A] sm:text-xl sm:tracking-[0.18em]">Tom Farm</span>
         </button>
 
         <nav className="flex min-w-0 flex-1 items-center justify-end gap-1 sm:justify-center sm:gap-1.5">
@@ -69,7 +69,7 @@ export function Header({ cartCount, currentPage, onNavigate, onCartOpen, user, o
                       : "bg-[#071114]/55 text-[#9DEBFF] group-hover:bg-[#6FD3F7]/18"
                   }`}
                 >
-                  <Icon size={13} strokeWidth={2.5} className="sm:h-3.5 sm:w-3.5" />
+                  <Icon size={14.5} strokeWidth={2.5} className="sm:h-4 sm:w-4" />
                 </span>
                 <span className="hidden lg:inline">{link.label}</span>
                 {link.page === "cart" && cartCount > 0 && (

@@ -49,8 +49,8 @@ export function HomePage({ onNavigate }: HomePageProps) {
               key={title}
               className="group flex min-h-[48px] items-center gap-2 rounded-[14px] border border-[#244A52] bg-[#071114]/70 px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] sm:min-h-[58px] sm:gap-2.5 sm:rounded-2xl"
             >
-              <span className="hidden h-8 w-8 shrink-0 place-items-center rounded-full border border-[#6FD3F7]/35 bg-[#10242A] text-[#D8FF7A] sm:grid">
-                <Icon size={15} strokeWidth={2.3} />
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-[#6FD3F7]/35 bg-[#10242A] text-[#D8FF7A] sm:h-8 sm:w-8">
+                <Icon size={13} strokeWidth={2.3} className="sm:h-[15px] sm:w-[15px]" />
               </span>
               <span className="min-w-0">
                 <span className="block text-[9px] font-black uppercase tracking-[0.2em] text-[#9DEBFF]">
