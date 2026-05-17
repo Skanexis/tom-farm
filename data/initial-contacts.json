@@ -1,0 +1,42 @@
+[
+  {
+    "id": 1,
+    "title": "Contatto Telegram",
+    "label": "@tomfatt",
+    "href": "https://t.me/tomfatt",
+    "type": "telegram",
+    "accent": "#6FD3F7"
+  },
+  {
+    "id": 2,
+    "title": "Canale Telegram",
+    "label": "Questo canale TG",
+    "href": "https://t.me/+oKLgAZuW3q9lMmVk",
+    "type": "telegram",
+    "accent": "#D8FF7A"
+  },
+  {
+    "id": 3,
+    "title": "Gruppo Potato",
+    "label": "Gruppo potato",
+    "href": "https://tatokdym.org/joinchat/6bIiJkxZ50ZpXHILdrU_eg",
+    "type": "group",
+    "accent": "#F4C95D"
+  },
+  {
+    "id": 4,
+    "title": "Gruppo Viber",
+    "label": "Gruppo viber",
+    "href": "https://invite.viber.com/?g2=AQBrfPpx8JzhZVTv%2BfQDmGfNxKW2KUDsUuPeXYUVwEu8HrHP%2FS4ebMTUOcz76krV",
+    "type": "viber",
+    "accent": "#A78BFA"
+  },
+  {
+    "id": 5,
+    "title": "Instagram",
+    "label": "@tom_farm__",
+    "href": "https://www.instagram.com/tom_farm__?igsh=MXVoM3ZzNjJ2NmRqcw==",
+    "type": "instagram",
+    "accent": "#6FD3F7"
+  }
+]

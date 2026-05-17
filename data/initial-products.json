@@ -1,0 +1,347 @@
+[
+  {
+    "id": 1,
+    "name": "Dry Commerciale",
+    "price": 200,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Hash",
+    "badge": "HOT",
+    "stock": 20,
+    "description": "Hash dry commerciale con formati bulk disponibili. Maggiori quantita su richiesta privata.",
+    "pricingOptions": [
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 200
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 340
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 1400
+      },
+      {
+        "amount": 1000,
+        "label": "1kg",
+        "price": 2500
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "name": "Dry-Sift Marvel Farm",
+    "price": 200,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Hash",
+    "badge": "NEW",
+    "stock": 18,
+    "description": "Dry-sift Marvel Farm con quantita maggiori disponibili.",
+    "pricingOptions": [
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 200
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 380
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 1700
+      },
+      {
+        "amount": 1000,
+        "label": "1kg",
+        "price": 3000
+      }
+    ]
+  },
+  {
+    "id": 3,
+    "name": "Filtered",
+    "price": 100,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Hash",
+    "badge": "SALE",
+    "stock": 3,
+    "description": "Filtered con disponibilita limitata.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 100
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 150
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 280
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 1200
+      }
+    ]
+  },
+  {
+    "id": 4,
+    "name": "Frozen Fly Farm Gorilla Glue",
+    "price": 150,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Frozen",
+    "badge": "",
+    "stock": 3,
+    "description": "Frozen Fly Farm Gorilla Glue con poca disponibilita.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 150
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 250
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 400
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 1800
+      }
+    ]
+  },
+  {
+    "id": 5,
+    "name": "Frozen Omerta Farm",
+    "price": 280,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Frozen",
+    "badge": "NEW",
+    "stock": 10,
+    "description": "Frozen Omerta Farm con quantita disponibili.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 280
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 500
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 900
+      },
+      {
+        "amount": 250,
+        "label": "250g",
+        "price": 2100
+      }
+    ]
+  },
+  {
+    "id": 6,
+    "name": "Cali America",
+    "price": 50,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Premium",
+    "badge": "",
+    "stock": 8,
+    "description": "Cali America con formati piccoli e quantita disponibili.",
+    "pricingOptions": [
+      {
+        "amount": 3.5,
+        "label": "3.5g",
+        "price": 50
+      },
+      {
+        "amount": 28,
+        "label": "28g",
+        "price": 350
+      },
+      {
+        "amount": 56,
+        "label": "56g",
+        "price": 600
+      },
+      {
+        "amount": 112,
+        "label": "112g",
+        "price": 1000
+      }
+    ]
+  },
+  {
+    "id": 7,
+    "name": "THV Mizztrezz 90u",
+    "price": 230,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Premium",
+    "badge": "",
+    "stock": 6,
+    "description": "THV Mizztrezz 90u con quantita disponibili fino a 1kg.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 230
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 380
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 700
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 3400
+      },
+      {
+        "amount": 1000,
+        "label": "1kg",
+        "price": 6200
+      }
+    ]
+  },
+  {
+    "id": 8,
+    "name": "THV FF x 24K",
+    "price": 300,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Premium",
+    "badge": "",
+    "stock": 3,
+    "description": "THV {FF x 24K} x {G.C. x 26mm}, poca disponibilita.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 300
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 500
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 850
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 4200
+      }
+    ]
+  },
+  {
+    "id": 9,
+    "name": "THV 2026 120u",
+    "price": 350,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Premium",
+    "badge": "",
+    "stock": 12,
+    "description": "Strain disponibili: Lemon Cherry Gelato x Cheese, Forbidden Fruit x Forbidden Fruit.",
+    "pricingOptions": [
+      {
+        "amount": 25,
+        "label": "25g",
+        "price": 350
+      },
+      {
+        "amount": 50,
+        "label": "50g",
+        "price": 600
+      },
+      {
+        "amount": 100,
+        "label": "100g",
+        "price": 1000
+      },
+      {
+        "amount": 500,
+        "label": "500g",
+        "price": 4500
+      },
+      {
+        "amount": 1000,
+        "label": "1kg",
+        "price": 8500
+      }
+    ]
+  },
+  {
+    "id": 10,
+    "name": "Vape Pen",
+    "price": 150,
+    "image": "https://images.unsplash.com/photo-1603909223429-69bb7101f420?auto=format&fit=crop&w=1080&q=80",
+    "photoUrl": "",
+    "videoUrl": "",
+    "category": "Vape",
+    "badge": "HOT",
+    "stock": 15,
+    "description": "Vape pen in confezioni multiple.",
+    "pricingOptions": [
+      {
+        "amount": 5,
+        "label": "5pz",
+        "price": 150
+      },
+      {
+        "amount": 10,
+        "label": "10pz",
+        "price": 250
+      },
+      {
+        "amount": 30,
+        "label": "30pz",
+        "price": 600
+      }
+    ]
+  }
+]
