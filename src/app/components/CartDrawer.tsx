@@ -2,7 +2,7 @@ import { X, Trash2, Plus, Minus, ReceiptText, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { Product, getProductOption } from "./ProductCard";
+import { Product, getProductCover, getProductOption } from "./ProductCard";
 
 export interface CartItem {
   product: Product;
@@ -133,8 +133,10 @@ export function CartDrawer({ isOpen, onClose, items, onUpdateQuantity, onRemove,
                             <div className="flex items-center gap-2 sm:gap-3">
                               <div className="h-9 w-9 flex-shrink-0 overflow-hidden rounded-lg bg-[#071114] sm:h-12 sm:w-12 sm:rounded-xl">
                                 <ImageWithFallback
-                                  src={item.product.photoUrl || item.product.image}
+                                  src={getProductCover(item.product)}
                                   alt={item.product.name}
+                                  loading="lazy"
+                                  decoding="async"
                                   className="h-full w-full object-cover opacity-70 grayscale"
                                 />
                               </div>

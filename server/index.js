@@ -20,12 +20,37 @@ const authSessions = new Map();
 const sessionByCode = new Map();
 let telegramPollingOffset = 0;
 let telegramPollingActive = false;
+let dbWriteQueue = Promise.resolve();
 
 const app = express();
 app.use(cors());
 app.use(express.json({ limit: "1mb" }));
 app.use("/uploads", express.static(uploadsDir));
 app.use(express.static(distDir));
+
+function normalizeUrlList(value, ...fallbacks) {
+  const urls = [
+    ...(Array.isArray(value) ? value : []),
+    ...fallbacks,
+  ]
+    .map((item) => String(item ?? "").trim())
+    .filter(Boolean);
+  return [...new Set(urls)];
+}
+
+function ensureProductMedia(product) {
+  const photos = normalizeUrlList(product.photos, product.photoUrl);
+  const videos = normalizeUrlList(product.videos, product.videoUrl);
+  const image = photos[0] || String(product.image ?? "");
+  return {
+    ...product,
+    photos,
+    videos,
+    photoUrl: photos[0] ?? "",
+    videoUrl: videos[0] ?? "",
+    image,
+  };
+}
 
 async function ensureDb() {
   await fs.mkdir(dataDir, { recursive: true });
@@ -50,11 +75,28 @@ async function readDb() {
     db.orders = [];
     await writeDb(db);
   }
+  if (Array.isArray(db.products)) {
+    let changed = false;
+    db.products = db.products.map((product) => {
+      const nextProduct = ensureProductMedia(product);
+      if (!Array.isArray(product.photos) || !Array.isArray(product.videos) || product.photoUrl !== nextProduct.photoUrl || product.videoUrl !== nextProduct.videoUrl) {
+        changed = true;
+      }
+      return nextProduct;
+    });
+    if (changed) await writeDb(db);
+  }
   return db;
 }
 
 async function writeDb(db) {
   await fs.writeFile(dbPath, `${JSON.stringify(db, null, 2)}\n`);
+}
+
+async function withDbWriteLock(operation) {
+  const run = dbWriteQueue.then(operation, operation);
+  dbWriteQueue = run.catch(() => {});
+  return run;
 }
 
 function publicUser(user) {
@@ -171,14 +213,19 @@ function normalizeProduct(input, existing = {}) {
     : existing.pricingOptions ?? [];
 
   const firstPrice = pricingOptions[0]?.price ?? Number(input.price ?? existing.price ?? 0);
+  const photos = normalizeUrlList(input.photos, input.photoUrl, existing.photoUrl, ...(Array.isArray(existing.photos) ? existing.photos : []));
+  const videos = normalizeUrlList(input.videos, input.videoUrl, existing.videoUrl, ...(Array.isArray(existing.videos) ? existing.videos : []));
+  const image = photos[0] || String(input.image ?? existing.image ?? "");
 
   return {
     ...existing,
     name: String(input.name ?? existing.name ?? "Nuovo prodotto"),
     price: Number.isFinite(firstPrice) ? firstPrice : 0,
-    image: String(input.image ?? existing.image ?? ""),
-    photoUrl: String(input.photoUrl ?? existing.photoUrl ?? ""),
-    videoUrl: String(input.videoUrl ?? existing.videoUrl ?? ""),
+    image,
+    photos,
+    videos,
+    photoUrl: photos[0] ?? "",
+    videoUrl: videos[0] ?? "",
     category: String(input.category ?? existing.category ?? "Hash"),
     badge: input.badge ? String(input.badge) : "",
     badgeVariant: String(input.badgeVariant ?? existing.badgeVariant ?? ""),
@@ -654,21 +701,70 @@ app.post("/api/orders", async (req, res) => {
   res.status(201).json(publicOrder(order));
 });
 
-app.post("/api/products/:id/media", requireAdmin, upload.fields([{ name: "photo", maxCount: 1 }, { name: "video", maxCount: 1 }]), async (req, res) => {
-  const db = await readDb();
-  const product = db.products.find((item) => String(item.id) === req.params.id);
-  if (!product) return res.status(404).json({ error: "Prodotto non trovato" });
+function attachProductMedia(product, kind, files = []) {
+  const urls = files.map((file) => `/uploads/${file.filename}`);
+  if (!urls.length) return;
 
-  const photo = req.files?.photo?.[0];
-  const video = req.files?.video?.[0];
-  if (photo) {
-    product.photoUrl = `/uploads/${photo.filename}`;
-    product.image = product.photoUrl;
+  if (kind === "photo") {
+    product.photos = normalizeUrlList(product.photos, product.photoUrl, ...urls);
+    product.photoUrl = product.photos[0] ?? "";
+    product.image = product.photoUrl || product.image || "";
   }
-  if (video) product.videoUrl = `/uploads/${video.filename}`;
+  if (kind === "video") {
+    product.videos = normalizeUrlList(product.videos, product.videoUrl, ...urls);
+    product.videoUrl = product.videos[0] ?? "";
+  }
+}
 
-  await writeDb(db);
-  res.json(product);
+app.post("/api/products/:id/media-file", requireAdmin, upload.single("file"), async (req, res) => {
+  const kind = req.query.kind === "video" ? "video" : "photo";
+  if (!req.file) return res.status(400).json({ error: "File richiesto" });
+
+  try {
+    const product = await withDbWriteLock(async () => {
+      const db = await readDb();
+      const item = db.products.find((entry) => String(entry.id) === req.params.id);
+      if (!item) {
+        const error = new Error("Prodotto non trovato");
+        error.status = 404;
+        throw error;
+      }
+
+      attachProductMedia(item, kind, [req.file]);
+      await writeDb(db);
+      return item;
+    });
+    res.json(product);
+  } catch (error) {
+    res.status(error.status ?? 500).json({ error: error.message ?? "Upload non riuscito" });
+  }
+});
+
+app.post("/api/products/:id/media", requireAdmin, upload.fields([
+  { name: "photo", maxCount: 1 },
+  { name: "video", maxCount: 1 },
+  { name: "photos", maxCount: 50 },
+  { name: "videos", maxCount: 3 },
+]), async (req, res) => {
+  try {
+    const product = await withDbWriteLock(async () => {
+      const db = await readDb();
+      const item = db.products.find((entry) => String(entry.id) === req.params.id);
+      if (!item) {
+        const error = new Error("Prodotto non trovato");
+        error.status = 404;
+        throw error;
+      }
+
+      attachProductMedia(item, "photo", [...(req.files?.photo ?? []), ...(req.files?.photos ?? [])]);
+      attachProductMedia(item, "video", [...(req.files?.video ?? []), ...(req.files?.videos ?? [])]);
+      await writeDb(db);
+      return item;
+    });
+    res.json(product);
+  } catch (error) {
+    res.status(error.status ?? 500).json({ error: error.message ?? "Upload non riuscito" });
+  }
 });
 
 app.post("/api/auth/telegram", async (req, res) => {

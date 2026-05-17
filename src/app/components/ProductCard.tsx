@@ -11,6 +11,8 @@ export interface Product {
   image: string;
   photoUrl?: string;
   videoUrl?: string;
+  photos?: string[];
+  videos?: string[];
   category: string;
   badge?: string;
   badgeVariant?: "new" | "top" | "sale" | "premium" | "limited" | "dark";
@@ -35,6 +37,22 @@ export const getProductOptions = (product: Product): ProductPricingOption[] =>
 
 export const getProductOption = (product: Product, amount: number): ProductPricingOption =>
   getProductOptions(product).find((option) => option.amount === amount) ?? getProductOptions(product)[0];
+
+export const getProductPhotos = (product: Product): string[] => {
+  const photos = [...(product.photos ?? []), product.photoUrl, product.image]
+    .map((url) => String(url ?? "").trim())
+    .filter(Boolean);
+  return [...new Set(photos)];
+};
+
+export const getProductVideos = (product: Product): string[] => {
+  const videos = [...(product.videos ?? []), product.videoUrl]
+    .map((url) => String(url ?? "").trim())
+    .filter(Boolean);
+  return [...new Set(videos)];
+};
+
+export const getProductCover = (product: Product): string => getProductPhotos(product)[0] ?? "";
 
 const categoryLabels: Record<string, string> = {
   Classic: "Classico",
@@ -95,6 +113,8 @@ export function ProductCard({ product, onQuickView }: ProductCardProps) {
   const [amount, setAmount] = useState(options[0]?.amount ?? 1);
   const badgeLabel = getBadgeLabel(product);
   const badgeVariant = getBadgeVariant(product);
+  const cover = getProductCover(product);
+  const mediaCount = getProductPhotos(product).length + getProductVideos(product).length;
   return (
     <motion.div
       whileHover={{ y: -3 }}
@@ -119,25 +139,19 @@ export function ProductCard({ product, onQuickView }: ProductCardProps) {
       <div className="tf-card-sweep pointer-events-none absolute inset-y-0 -left-1/2 z-10 w-1/2 bg-[linear-gradient(90deg,transparent,rgba(111,211,247,0.10),transparent)]" />
       <div className="relative grid h-full min-h-[250px] grid-cols-1 sm:min-h-[205px]">
         <div className="relative min-h-[112px] overflow-hidden border-b border-[#2B5360]/45 bg-[#071114] sm:min-h-[168px]">
-          {product.videoUrl ? (
-            <video
-              src={product.videoUrl}
-              muted
-              loop
-              playsInline
-              preload="metadata"
-              className="absolute inset-0 h-full w-full object-cover opacity-25 grayscale transition-all duration-500 group-hover:opacity-35 group-hover:scale-105"
-              onMouseEnter={(event) => event.currentTarget.play()}
-              onMouseLeave={(event) => event.currentTarget.pause()}
-            />
-          ) : (
-            <ImageWithFallback
-              src={product.photoUrl || product.image}
-              alt={product.name}
-              className="absolute inset-0 h-full w-full object-cover opacity-18 grayscale transition-all duration-500 group-hover:opacity-25 group-hover:scale-105"
-            />
-          )}
+          <ImageWithFallback
+            src={cover}
+            alt={product.name}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover opacity-22 grayscale transition-all duration-500 group-hover:opacity-32 group-hover:scale-105"
+          />
           <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(7,17,20,0.92),rgba(20,42,48,0.72))]" />
+          {mediaCount > 1 && (
+            <div className="absolute left-3 top-3 z-20 rounded-full border border-white/10 bg-[#071114]/85 px-2 py-0.5 text-[9px] font-black text-[#9DEBFF]">
+              {mediaCount} media
+            </div>
+          )}
           <div className="absolute inset-0 grid place-items-center">
             <div className="grid h-12 w-12 place-items-center rounded-full border border-[#6FD3F7]/45 bg-[#6FD3F7]/10 shadow-[0_0_44px_rgba(111,211,247,0.18)] sm:h-16 sm:w-16">
               <div className="grid h-7 w-7 place-items-center rounded-full border border-[#D8FF7A] text-[#D8FF7A] sm:h-8 sm:w-8">

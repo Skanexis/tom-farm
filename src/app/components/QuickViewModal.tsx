@@ -1,8 +1,8 @@
-import { X, ShoppingCart, Zap, MessageCircle, Minus, Plus } from "lucide-react";
+import { X, ShoppingCart, Zap, MessageCircle, Minus, Plus, ChevronLeft, ChevronRight, Image as ImageIcon, Play } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { Product, badgeVariantClasses, getBadgeLabel, getBadgeVariant, getProductOption, getProductOptions } from "./ProductCard";
+import { Product, badgeVariantClasses, getBadgeLabel, getBadgeVariant, getProductOption, getProductOptions, getProductPhotos, getProductVideos } from "./ProductCard";
 
 const categoryLabels: Record<string, string> = {
   Classic: "Classico",
@@ -31,11 +31,24 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
   const [quantity, setQuantity] = useState(1);
   const [amount, setAmount] = useState(1);
   const [added, setAdded] = useState(false);
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
+
+  useEffect(() => {
+    setActiveMediaIndex(0);
+    setQuantity(1);
+    setAmount(1);
+  }, [product?.id]);
 
   if (!product) return null;
 
   const options = getProductOptions(product);
   const selectedOption = getProductOption(product, options.some((option) => option.amount === amount) ? amount : options[0].amount);
+  const media = [
+    ...getProductPhotos(product).map((url) => ({ type: "photo" as const, url })),
+    ...getProductVideos(product).map((url) => ({ type: "video" as const, url })),
+  ];
+  const activeMedia = media[activeMediaIndex] ?? media[0];
+  const goMedia = (step: number) => setActiveMediaIndex((current) => (current + step + media.length) % media.length);
 
   const handleAdd = () => {
     onAddToCart(product, selectedOption.amount, quantity);
@@ -72,23 +85,36 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col md:flex-row">
-                {/* Image */}
-                <div className="relative md:w-1/2 h-64 md:h-auto bg-[#1A1A1E]">
-                  {product.videoUrl ? (
+                <div className="relative flex h-72 flex-col bg-[#1A1A1E] md:h-auto md:w-1/2">
+                  <div className="relative min-h-0 flex-1 overflow-hidden">
+                  {activeMedia?.type === "video" ? (
                     <video
-                      src={product.videoUrl}
+                      key={activeMedia.url}
+                      src={activeMedia.url}
                       controls
-                      autoPlay
                       muted
                       playsInline
+                      preload="metadata"
                       className="h-full w-full object-cover"
                     />
                   ) : (
                     <ImageWithFallback
-                      src={product.photoUrl || product.image}
+                      src={activeMedia?.url}
                       alt={product.name}
+                      loading="eager"
+                      decoding="async"
                       className="w-full h-full object-cover"
                     />
+                  )}
+                  {media.length > 1 && (
+                    <>
+                      <button onClick={() => goMedia(-1)} className="absolute left-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75">
+                        <ChevronLeft size={18} />
+                      </button>
+                      <button onClick={() => goMedia(1)} className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-black/55 text-white backdrop-blur transition hover:bg-black/75">
+                        <ChevronRight size={18} />
+                      </button>
+                    </>
                   )}
                   {badgeLabel && (
                     <div className={`absolute top-4 left-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur-md ${
@@ -100,6 +126,30 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
                   {discount > 0 && (
                     <div className="absolute top-4 right-4 bg-[#48C78E] px-2 py-1 rounded-lg text-[#071114] text-xs font-bold">
                       -{discount}%
+                    </div>
+                  )}
+                  </div>
+                  {media.length > 1 && (
+                    <div className="flex h-16 gap-2 overflow-x-auto border-t border-white/10 bg-[#0B0F12] p-2">
+                      {media.map((item, index) => (
+                        <button
+                          key={`${item.type}-${item.url}`}
+                          onClick={() => setActiveMediaIndex(index)}
+                          className={`relative h-12 w-14 flex-shrink-0 overflow-hidden rounded-xl border transition ${index === activeMediaIndex ? "border-[#D8FF7A]" : "border-white/10 opacity-70 hover:opacity-100"}`}
+                        >
+                          {item.type === "photo" ? (
+                            <ImageWithFallback src={item.url} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                          ) : (
+                            <>
+                              <video src={item.url} preload="metadata" muted playsInline className="h-full w-full object-cover" />
+                              <span className="absolute inset-0 grid place-items-center bg-black/35 text-white"><Play size={13} fill="currentColor" /></span>
+                            </>
+                          )}
+                          <span className="absolute bottom-1 right-1 rounded bg-black/65 p-0.5 text-white">
+                            {item.type === "photo" ? <ImageIcon size={9} /> : <Play size={9} fill="currentColor" />}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   )}
                 </div>

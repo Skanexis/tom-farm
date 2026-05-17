@@ -1,7 +1,8 @@
-import { CheckCircle, Image, PackageCheck, Plus, ReceiptText, Save, Search, Trash2, Upload, Users, Video } from "lucide-react";
+import { AlertCircle, CheckCircle, Image, Loader2, Plus, ReceiptText, Save, Search, Trash2, Upload, Users, Video } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AppUser, ContactItem } from "../App";
 import { badgeVariantClasses } from "./ProductCard";
+import { getProductPhotos, getProductVideos } from "./ProductCard";
 import type { Product, ProductPricingOption } from "./ProductCard";
 
 interface AdminPageProps {
@@ -31,6 +32,15 @@ interface AdminOrder {
   user: AppUser | null;
 }
 
+interface UploadItem {
+  id: string;
+  name: string;
+  kind: "photo" | "video";
+  progress: number;
+  status: "queued" | "uploading" | "done" | "error";
+  error?: string;
+}
+
 const emptyProduct: Product = {
   id: 0,
   name: "Nuovo prodotto",
@@ -38,6 +48,8 @@ const emptyProduct: Product = {
   image: "",
   photoUrl: "",
   videoUrl: "",
+  photos: [],
+  videos: [],
   category: "Hash",
   badge: undefined,
   stock: 0,
@@ -82,6 +94,7 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
   const [contactDraft, setContactDraft] = useState<ContactItem>(contacts[0] ?? emptyContact);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("");
+  const [uploads, setUploads] = useState<UploadItem[]>([]);
   const filteredProducts = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -178,22 +191,69 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
     setTimeout(() => setStatus(""), 1800);
   };
 
-  const uploadMedia = async (kind: "photo" | "video", file: File | null) => {
-    if (!file || !draft.id) return;
-    const form = new FormData();
-    form.append(kind, file);
-    const response = await fetch(`/api/products/${draft.id}/media`, {
-      method: "POST",
-      headers: { "x-user-id": user.id },
-      body: form,
+  const updateUpload = (id: string, patch: Partial<UploadItem>) => {
+    setUploads((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  };
+
+  const uploadOneFile = (kind: "photo" | "video", file: File, id: string) => {
+    return new Promise<Product>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const form = new FormData();
+      form.append("file", file);
+
+      xhr.upload.onprogress = (event) => {
+        if (!event.lengthComputable) return;
+        updateUpload(id, { progress: Math.round((event.loaded / event.total) * 100), status: "uploading" });
+      };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || "{}");
+          if (xhr.status >= 200 && xhr.status < 300) {
+            updateUpload(id, { progress: 100, status: "done" });
+            resolve(data);
+          } else {
+            throw new Error(data.error || "Upload non riuscito");
+          }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "Upload non riuscito";
+          updateUpload(id, { status: "error", error: message });
+          reject(error);
+        }
+      };
+      xhr.onerror = () => {
+        updateUpload(id, { status: "error", error: "Errore rete" });
+        reject(new Error("Errore rete"));
+      };
+      xhr.open("POST", `/api/products/${draft.id}/media-file?kind=${kind}`);
+      xhr.setRequestHeader("x-user-id", user.id);
+      xhr.send(form);
     });
-    const updated = await response.json();
-    if (response.ok) {
-      setStatus(kind === "photo" ? "Foto caricata" : "Video caricato");
-      setDraft(updated);
-      await onProductsChange();
-      setTimeout(() => setStatus(""), 1800);
-    }
+  };
+
+  const uploadMediaFiles = async (kind: "photo" | "video", list: FileList | null) => {
+    if (!list?.length || !draft.id) return;
+    const files = Array.from(list).filter((file) => kind === "photo" ? file.type.startsWith("image/") : file.type.startsWith("video/"));
+    const limitedFiles = kind === "video" ? files.slice(0, 3) : files;
+    if (!limitedFiles.length) return;
+
+    const batch = limitedFiles.map((file) => ({
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: file.name,
+      kind,
+      progress: 0,
+      status: "queued" as const,
+    }));
+    setUploads((current) => [...batch, ...current].slice(0, 24));
+    setStatus(kind === "photo" ? "Caricamento foto..." : "Caricamento video...");
+
+    const results = await Promise.allSettled(batch.map((item, index) => uploadOneFile(kind, limitedFiles[index], item.id)));
+    const latest = [...results].reverse().find((result): result is PromiseFulfilledResult<Product> => result.status === "fulfilled")?.value;
+    if (latest) setDraft(latest);
+    await onProductsChange();
+
+    const failed = results.filter((result) => result.status === "rejected").length;
+    setStatus(failed ? `Caricati ${results.length - failed}, errori ${failed}` : "Media caricati");
+    setTimeout(() => setStatus(""), 2200);
   };
 
   const saveContact = async () => {
@@ -270,7 +330,7 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
             </div>
             <div className="rounded-xl bg-white/7 p-2">
               <p className="text-[9px] font-black uppercase text-[#8EA9AF]">Media</p>
-              <p className="text-lg font-black text-[#6FD3F7]">{products.filter((product) => product.photoUrl || product.videoUrl).length}</p>
+              <p className="text-lg font-black text-[#6FD3F7]">{products.filter((product) => getProductPhotos(product).length || getProductVideos(product).length).length}</p>
             </div>
           </div>
           <div className="max-h-56 space-y-2 overflow-y-auto lg:max-h-none">
@@ -577,25 +637,81 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
             </div>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-black"><Image size={14} /> Foto</div>
-              {draft.photoUrl || draft.image ? <img src={draft.photoUrl || draft.image} className="mb-3 h-28 w-full rounded-xl object-cover" /> : null}
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#6FD3F7] px-3 py-2 text-xs font-black text-[#071114]">
-                <Upload size={13} />
-                Carica foto
-                <input hidden type="file" accept="image/*" disabled={!draft.id} onChange={(event) => uploadMedia("photo", event.target.files?.[0] ?? null)} />
-              </label>
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-sm font-black">Media prodotto</h3>
+                <p className="mt-0.5 text-[10px] font-bold text-[#8EA9AF]">La prima foto appare subito nel catalogo. Nella scheda si vedono foto e video.</p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black ${draft.id ? "bg-[#6FD3F7] text-[#071114]" : "bg-white/7 text-[#8EA9AF]"}`}>
+                  <Upload size={13} />
+                  Foto multiple
+                  <input hidden multiple type="file" accept="image/*" disabled={!draft.id} onChange={(event) => { uploadMediaFiles("photo", event.target.files); event.currentTarget.value = ""; }} />
+                </label>
+                <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl px-3 py-2 text-xs font-black ${draft.id ? "bg-[#D8FF7A] text-[#071114]" : "bg-white/7 text-[#8EA9AF]"}`}>
+                  <Upload size={13} />
+                  Video fino a 3
+                  <input hidden multiple type="file" accept="video/*" disabled={!draft.id} onChange={(event) => { uploadMediaFiles("video", event.target.files); event.currentTarget.value = ""; }} />
+                </label>
+              </div>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
-              <div className="mb-2 flex items-center gap-2 text-xs font-black"><Video size={14} /> Video</div>
-              {draft.videoUrl ? <video src={draft.videoUrl} controls className="mb-3 h-28 w-full rounded-xl object-cover" /> : <div className="mb-3 grid h-28 place-items-center rounded-xl bg-[#071114] text-xs text-[#8EA9AF]">Nessun video</div>}
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl bg-[#D8FF7A] px-3 py-2 text-xs font-black text-[#071114]">
-                <Upload size={13} />
-                Carica video
-                <input hidden type="file" accept="video/*" disabled={!draft.id} onChange={(event) => uploadMedia("video", event.target.files?.[0] ?? null)} />
-              </label>
+
+            {!draft.id && (
+              <div className="mb-3 rounded-xl border border-[#F4C95D]/25 bg-[#F4C95D]/10 px-3 py-2 text-[10px] font-bold text-[#F7D77D]">
+                Prima salva il nuovo prodotto, poi carica foto e video.
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1.2fr_1fr]">
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-xs font-black"><Image size={14} /> Foto ({getProductPhotos(draft).length})</div>
+                {getProductPhotos(draft).length ? (
+                  <div className="grid grid-cols-3 gap-2">
+                    {getProductPhotos(draft).slice(0, 9).map((url, index) => (
+                      <div key={`${url}-${index}`} className="relative h-20 overflow-hidden rounded-xl bg-[#071114]">
+                        <img src={url} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                        {index === 0 && <span className="absolute left-1.5 top-1.5 rounded-full bg-[#D8FF7A] px-1.5 py-0.5 text-[8px] font-black text-[#071114]">Catalogo</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid h-24 place-items-center rounded-xl bg-[#071114] text-xs text-[#8EA9AF]">Nessuna foto</div>
+                )}
+              </div>
+              <div>
+                <div className="mb-2 flex items-center gap-2 text-xs font-black"><Video size={14} /> Video ({getProductVideos(draft).length})</div>
+                {getProductVideos(draft).length ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {getProductVideos(draft).slice(0, 6).map((url, index) => (
+                      <video key={`${url}-${index}`} src={url} controls preload="metadata" className="h-20 w-full rounded-xl bg-[#071114] object-cover" />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid h-24 place-items-center rounded-xl bg-[#071114] text-xs text-[#8EA9AF]">Nessun video</div>
+                )}
+              </div>
             </div>
+
+            {uploads.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {uploads.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-white/10 bg-[#071114]/70 px-3 py-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex min-w-0 items-center gap-2">
+                        {item.status === "uploading" || item.status === "queued" ? <Loader2 size={13} className="animate-spin text-[#6FD3F7]" /> : item.status === "done" ? <CheckCircle size={13} className="text-[#48C78E]" /> : <AlertCircle size={13} className="text-[#FF6B6B]" />}
+                        <span className="truncate text-[10px] font-bold text-[#F5F7EE]">{item.name}</span>
+                      </div>
+                      <span className="text-[10px] font-black text-[#8EA9AF]">{item.status === "error" ? "Errore" : `${item.progress}%`}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                      <div className={`h-full rounded-full ${item.status === "error" ? "bg-[#FF6B6B]" : "bg-[#6FD3F7]"}`} style={{ width: `${item.status === "error" ? 100 : item.progress}%` }} />
+                    </div>
+                    {item.error && <p className="mt-1 text-[9px] font-bold text-[#FF8A8A]">{item.error}</p>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
             </>
           )}
