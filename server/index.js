@@ -516,6 +516,40 @@ app.get("/api/contacts", async (_req, res) => {
   res.json(db.contacts);
 });
 
+app.get("/api/admin/users", requireAdmin, async (_req, res) => {
+  const db = await readDb();
+  const ordersByUser = new Map();
+  for (const order of db.orders) {
+    const stats = ordersByUser.get(order.userId) ?? { orders: 0, approvedTotal: 0 };
+    stats.orders += 1;
+    if (order.status === "accepted" || order.status === "completed") stats.approvedTotal += Number(order.total ?? 0);
+    ordersByUser.set(order.userId, stats);
+  }
+
+  res.json(db.users.map((user) => ({
+    ...publicUser(user),
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    orderCount: ordersByUser.get(String(user.id))?.orders ?? 0,
+    approvedTotal: ordersByUser.get(String(user.id))?.approvedTotal ?? 0,
+  })));
+});
+
+app.get("/api/admin/orders", requireAdmin, async (_req, res) => {
+  const db = await readDb();
+  const usersById = new Map(db.users.map((user) => [String(user.id), publicUser(user)]));
+  const orders = db.orders
+    .slice()
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map((order) => ({
+      ...publicOrder(order),
+      user: usersById.get(String(order.userId)) ?? null,
+      updatedAt: order.updatedAt,
+      reviewedBy: order.reviewedBy,
+    }));
+  res.json(orders);
+});
+
 app.post("/api/contacts", requireAdmin, async (req, res) => {
   const db = await readDb();
   const nextId = db.contacts.reduce((max, contact) => Math.max(max, Number(contact.id)), 0) + 1;

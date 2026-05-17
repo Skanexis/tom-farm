@@ -1,4 +1,4 @@
-import { Package, Bell, LogOut, ChevronRight, ShoppingBag, Clock, CheckCircle, BadgeCheck, Zap, XCircle } from "lucide-react";
+import { Package, LogOut, ShoppingBag, Clock, CheckCircle, BadgeCheck, Zap, XCircle } from "lucide-react";
 import { motion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -19,7 +19,7 @@ interface Order {
 }
 
 interface ProfilePageProps {
-  user: { name: string; id: string; photoUrl?: string } | null;
+  user: { name: string; id: string; photoUrl?: string; isAdmin?: boolean } | null;
   onLoginClick: () => void;
   onLogout: () => void;
   onNavigate: (page: string) => void;
@@ -74,8 +74,9 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
     );
   }
 
-  const totalSpent = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
-  const completedOrders = useMemo(() => orders.filter((order) => order.status === "completed").length, [orders]);
+  const approvedOrders = useMemo(() => orders.filter((order) => order.status === "accepted" || order.status === "completed"), [orders]);
+  const totalSpent = useMemo(() => approvedOrders.reduce((sum, order) => sum + order.total, 0), [approvedOrders]);
+  const completedOrders = approvedOrders.length;
   const formatOrderDate = (date: string) => new Intl.DateTimeFormat("it-IT", {
     day: "numeric",
     month: "long",
@@ -83,20 +84,20 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
   }).format(new Date(date));
 
   return (
-    <div className="min-h-full bg-transparent pt-28 pb-10">
-      <div className="max-w-[860px] mx-auto px-6 py-10">
+    <div className="min-h-full overflow-x-hidden bg-transparent px-3 pb-8 pt-20 sm:px-0 sm:pb-10 sm:pt-28">
+      <div className="mx-auto max-w-[860px] overflow-x-hidden px-0 py-4 sm:px-6 sm:py-10">
         {/* Profile header card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden bg-[#141416] rounded-3xl border border-white/5 p-8 mb-8"
+          className="relative mb-5 overflow-hidden rounded-2xl border border-white/5 bg-[#141416] p-4 sm:mb-8 sm:rounded-3xl sm:p-8"
         >
           {/* bg glow */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-[#6FD3F7]/10 rounded-full blur-[80px] pointer-events-none" />
 
-          <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
+          <div className="relative flex min-w-0 flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
             <div className="relative">
-              <div className="w-20 h-20 overflow-hidden rounded-2xl bg-gradient-to-br from-[#6FD3F7] to-[#D8FF7A] flex items-center justify-center text-white font-black text-3xl shadow-[0_0_30px_rgba(111,211,247,0.24)]">
+              <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-[#6FD3F7] to-[#D8FF7A] text-2xl font-black text-white shadow-[0_0_30px_rgba(111,211,247,0.24)] sm:h-20 sm:w-20 sm:text-3xl">
                 {user.photoUrl ? (
                   <img src={user.photoUrl} alt={user.name} className="h-full w-full object-cover" />
                 ) : (
@@ -108,20 +109,22 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
               </div>
             </div>
 
-            <div className="flex-1">
+            <div className="min-w-0 flex-1">
               <h1 className="text-white font-black text-2xl mb-1">{user.name}</h1>
               <div className="flex items-center gap-2 mb-3">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="#229ED9">
                   <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
                 </svg>
-                <span className="text-[#229ED9] text-sm">Telegram ID: {user.id}</span>
+                <span className="min-w-0 truncate text-sm text-[#229ED9]">Telegram ID: {user.id}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1 bg-[#6FD3F7]/10 border border-[#6FD3F7]/20 px-3 py-1 rounded-full">
-                  <BadgeCheck size={12} className="text-[#6FD3F7]" />
-                  <span className="text-[#6FD3F7] text-xs font-semibold">Membro premium</span>
+              {user.isAdmin && (
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 rounded-full border border-[#6FD3F7]/20 bg-[#6FD3F7]/10 px-3 py-1">
+                    <BadgeCheck size={12} className="text-[#6FD3F7]" />
+                    <span className="text-xs font-semibold text-[#6FD3F7]">ADMIN</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
             <button
@@ -134,7 +137,7 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
           </div>
 
           {/* Stats */}
-          <div className="relative grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5">
+          <div className="relative mt-5 grid grid-cols-3 gap-2 border-t border-white/5 pt-5 sm:mt-8 sm:gap-4 sm:pt-8">
             {[
               { label: "Ordini totali", value: orders.length, icon: <ShoppingBag size={18} className="text-[#6FD3F7]" /> },
               { label: "Completati", value: completedOrders, icon: <CheckCircle size={18} className="text-[#30D158]" /> },
@@ -142,20 +145,20 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="flex justify-center mb-2">{stat.icon}</div>
-                <p className="text-white font-black text-2xl">{stat.value}</p>
-                <p className="text-[#A1A1AA] text-xs mt-1">{stat.label}</p>
+                <p className="text-lg font-black text-white sm:text-2xl">{stat.value}</p>
+                <p className="mt-1 text-[10px] text-[#A1A1AA] sm:text-xs">{stat.label}</p>
               </div>
             ))}
           </div>
         </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid min-w-0 gap-4">
           {/* Orders */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="md:col-span-2 bg-[#141416] rounded-3xl border border-white/5 p-6"
+            className="min-w-0 rounded-2xl border border-white/5 bg-[#141416] p-4 sm:rounded-3xl sm:p-6"
           >
             <h2 className="text-white font-bold text-lg mb-5 flex items-center gap-2">
               <Package size={18} className="text-[#6FD3F7]" />
@@ -188,83 +191,29 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
                 return (
                   <div
                     key={order.id}
-                    className="flex items-center justify-between p-4 rounded-2xl bg-[#0F0F11] border border-white/5 hover:border-white/10 transition-all cursor-pointer group"
+                    className="grid min-w-0 grid-cols-1 gap-3 rounded-2xl border border-white/5 bg-[#0F0F11] p-3 transition-all hover:border-white/10 sm:flex sm:items-center sm:justify-between sm:p-4"
                   >
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-[#6FD3F7]/10 flex items-center justify-center">
+                    <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#6FD3F7]/10 sm:h-10 sm:w-10">
                         <ShoppingBag size={16} className="text-[#6FD3F7]" />
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-white font-semibold text-sm">{order.id}</p>
-                        <p className="text-[#A1A1AA] text-xs mt-0.5">
+                        <p className="mt-0.5 truncate text-xs text-[#A1A1AA]">
                           {formatOrderDate(order.createdAt)} · {itemCount} articolo{itemCount > 1 ? "i" : ""}{order.service ? ` · ${order.service}` : ""}
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex min-w-0 items-center justify-between gap-2 sm:gap-4">
                       <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg ${s.bg}`}>
                         <span className={s.color}>{s.icon}</span>
                         <span className={`${s.color} text-xs font-medium`}>{s.label}</span>
                       </div>
                       <span className="text-white font-bold text-sm">{order.total.toFixed(2)}€</span>
-                      <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-white transition-colors" />
                     </div>
                   </div>
                 );
               })}
-            </div>
-          </motion.div>
-
-          {/* Settings panel */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="space-y-4"
-          >
-            {/* Notifications */}
-            <div className="bg-[#141416] rounded-3xl border border-white/5 p-6">
-              <h2 className="text-white font-bold mb-4 flex items-center gap-2">
-                <Bell size={18} className="text-[#6FD3F7]" />
-                Notifiche
-              </h2>
-              <div className="space-y-4">
-                {[
-                  { label: "Aggiornamenti ordini", enabled: true },
-                  { label: "Promozioni", enabled: false },
-                  { label: "Nuovi arrivi", enabled: true },
-                ].map((item) => (
-                  <div key={item.label} className="flex items-center justify-between">
-                    <span className="text-[#A1A1AA] text-sm">{item.label}</span>
-                    <div
-                      className={`w-10 h-6 rounded-full transition-all cursor-pointer relative ${item.enabled ? "bg-[#6FD3F7]" : "bg-white/10"}`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${item.enabled ? "left-5" : "left-1"}`} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick actions */}
-            <div className="bg-[#141416] rounded-3xl border border-white/5 p-6">
-              <h2 className="text-white font-bold mb-4">Azioni rapide</h2>
-              <div className="space-y-2">
-                {[
-                  { label: "Sfoglia il negozio", action: () => onNavigate("shop"), color: "text-[#6FD3F7]" },
-                  { label: "Contatta supporto", action: () => {}, color: "text-[#229ED9]" },
-                  { label: "Aggiorna profilo", action: () => {}, color: "text-[#30D158]" },
-                ].map((action) => (
-                  <button
-                    key={action.label}
-                    onClick={action.action}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl hover:bg-white/5 transition-all group"
-                  >
-                    <span className={`text-sm font-medium ${action.color}`}>{action.label}</span>
-                    <ChevronRight size={16} className="text-[#A1A1AA] group-hover:text-white transition-colors" />
-                  </button>
-                ))}
-              </div>
             </div>
           </motion.div>
         </div>

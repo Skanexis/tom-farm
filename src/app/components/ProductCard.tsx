@@ -54,12 +54,12 @@ const categoryLabels: Record<string, string> = {
 };
 
 export const badgeVariantClasses: Record<string, string> = {
-  new: "bg-[#D8FF7A] text-[#0B1113]",
-  top: "bg-[#6FD3F7] text-[#071114]",
-  sale: "bg-[#F4C95D] text-[#171008]",
-  premium: "bg-[#BF5AF2] text-white",
-  limited: "bg-[#48C78E] text-[#071114]",
-  dark: "border border-[#6FD3F7]/40 bg-[#071114]/90 text-[#9DEBFF]",
+  top: "border border-[#6FD3F7]/45 bg-[#6FD3F7] text-[#071114] shadow-[0_0_18px_rgba(111,211,247,0.22)]",
+  new: "border border-[#D8FF7A]/45 bg-[#D8FF7A] text-[#0B1113] shadow-[0_0_18px_rgba(216,255,122,0.22)]",
+  sale: "border border-[#F4C95D]/45 bg-[#F4C95D] text-[#171008] shadow-[0_0_18px_rgba(244,201,93,0.20)]",
+  premium: "border border-[#D8FF7A]/35 bg-[linear-gradient(135deg,#BF5AF2,#6FD3F7)] text-white shadow-[0_0_20px_rgba(191,90,242,0.28)]",
+  limited: "border border-[#48C78E]/45 bg-[#48C78E] text-[#071114] shadow-[0_0_18px_rgba(72,199,142,0.22)]",
+  dark: "border border-[#6FD3F7]/50 bg-[#071114]/95 text-[#9DEBFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_18px_rgba(111,211,247,0.12)]",
 };
 
 const legacyBadgeLabels: Record<string, string> = {
