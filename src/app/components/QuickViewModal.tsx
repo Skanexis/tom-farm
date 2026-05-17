@@ -91,7 +91,7 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
                     />
                   )}
                   {badgeLabel && (
-                    <div className={`absolute top-4 left-4 px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                    <div className={`absolute top-4 left-4 rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] backdrop-blur-md ${
                       badgeVariantClasses[badgeVariant] ?? badgeVariantClasses.top
                     }`}>
                       {badgeLabel}

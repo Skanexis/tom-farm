@@ -64,6 +64,13 @@ const emptyContact: ContactItem = {
   accent: "#6FD3F7",
 };
 
+function parseAmountFromLabel(label: string): number {
+  const normalized = label.trim().toLowerCase().replace(",", ".");
+  const value = Number.parseFloat(normalized);
+  if (!Number.isFinite(value)) return 0;
+  return normalized.includes("kg") ? value * 1000 : value;
+}
+
 export function AdminPage({ user, products, contacts, onLoginClick, onProductsChange, onContactsChange }: AdminPageProps) {
   const [selectedId, setSelectedId] = useState<number>(products[0]?.id ?? 0);
   const [query, setQuery] = useState("");
@@ -139,6 +146,9 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
     const pricingOptions = [...(draft.pricingOptions ?? [])];
     pricingOptions[index] = { ...pricingOptions[index], ...patch };
     updateDraft({ pricingOptions });
+  };
+  const updateOptionLabel = (index: number, label: string) => {
+    updateOption(index, { label, amount: parseAmountFromLabel(label) });
   };
 
   const saveProduct = async () => {
@@ -522,9 +532,9 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
                   key={preset.value}
                   type="button"
                   onClick={() => updateDraft({ badgeVariant: preset.value as Product["badgeVariant"] })}
-                  className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.08em] transition ${
+                  className={`rounded-full px-3 py-1.5 text-[9px] font-black uppercase tracking-[0.12em] backdrop-blur-md transition ${
                     badgeVariantClasses[preset.value]
-                  } ${draft.badgeVariant === preset.value ? "scale-105 ring-2 ring-white/60" : "opacity-75 hover:scale-105 hover:opacity-100"}`}
+                  } ${draft.badgeVariant === preset.value ? "ring-2 ring-[#D8FF7A]/45" : "opacity-70 hover:opacity-100"}`}
                   title={preset.label}
                 >
                   {draft.badge || preset.sample}
@@ -545,7 +555,7 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
             <div className="mb-3 flex items-center justify-between">
               <h3 className="text-sm font-black">Formati e prezzi</h3>
               <button
-                onClick={() => updateDraft({ pricingOptions: [...(draft.pricingOptions ?? []), { amount: 0, label: "Nuovo", price: 0 }] })}
+                onClick={() => updateDraft({ pricingOptions: [...(draft.pricingOptions ?? []), { amount: 0, label: "", price: 0 }] })}
                 className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black text-[#D8FF7A]"
               >
                 Aggiungi formato
@@ -553,10 +563,9 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
             </div>
             <div className="space-y-2">
               {(draft.pricingOptions ?? []).map((option, index) => (
-                <div key={`${option.label}-${index}`} className="grid grid-cols-[1fr_1fr_1fr_32px] gap-1.5 sm:gap-2">
-                  <input className={inputClass} value={option.label} onChange={(event) => updateOption(index, { label: event.target.value })} placeholder="50g" />
-                  <input className={inputClass} type="number" value={option.amount} onChange={(event) => updateOption(index, { amount: Number(event.target.value) })} placeholder="50" />
-                  <input className={inputClass} type="number" value={option.price} onChange={(event) => updateOption(index, { price: Number(event.target.value) })} placeholder="200" />
+                <div key={`${option.label}-${index}`} className="grid grid-cols-[1fr_1fr_32px] gap-1.5 sm:gap-2">
+                  <input className={inputClass} value={option.label} onChange={(event) => updateOptionLabel(index, event.target.value)} placeholder="50g o 1kg" />
+                  <input className={inputClass} type="number" value={option.price} onChange={(event) => updateOption(index, { price: Number(event.target.value) })} placeholder="Prezzo" />
                   <button
                     onClick={() => updateDraft({ pricingOptions: (draft.pricingOptions ?? []).filter((_, i) => i !== index) })}
                     className="grid place-items-center rounded-xl bg-white/7 text-[#A8B4B7] hover:text-[#F5F7EE]"

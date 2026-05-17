@@ -54,12 +54,12 @@ const categoryLabels: Record<string, string> = {
 };
 
 export const badgeVariantClasses: Record<string, string> = {
-  top: "border border-[#6FD3F7]/45 bg-[#6FD3F7] text-[#071114] shadow-[0_0_18px_rgba(111,211,247,0.22)]",
-  new: "border border-[#D8FF7A]/45 bg-[#D8FF7A] text-[#0B1113] shadow-[0_0_18px_rgba(216,255,122,0.22)]",
-  sale: "border border-[#F4C95D]/45 bg-[#F4C95D] text-[#171008] shadow-[0_0_18px_rgba(244,201,93,0.20)]",
-  premium: "border border-[#D8FF7A]/35 bg-[linear-gradient(135deg,#BF5AF2,#6FD3F7)] text-white shadow-[0_0_20px_rgba(191,90,242,0.28)]",
-  limited: "border border-[#48C78E]/45 bg-[#48C78E] text-[#071114] shadow-[0_0_18px_rgba(72,199,142,0.22)]",
-  dark: "border border-[#6FD3F7]/50 bg-[#071114]/95 text-[#9DEBFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_18px_rgba(111,211,247,0.12)]",
+  top: "border border-[#6FD3F7]/45 bg-[#10242A]/92 text-[#9DEBFF] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_0_18px_rgba(111,211,247,0.10)]",
+  new: "border border-[#D8FF7A]/40 bg-[#182118]/92 text-[#D8FF7A] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_0_18px_rgba(216,255,122,0.10)]",
+  sale: "border border-[#F4C95D]/40 bg-[#241F12]/92 text-[#F4C95D] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_0_18px_rgba(244,201,93,0.09)]",
+  premium: "border border-[#6FD3F7]/35 bg-[linear-gradient(135deg,rgba(16,36,42,0.96),rgba(24,33,24,0.92))] text-[#F5F7EE] shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_0_18px_rgba(111,211,247,0.10)]",
+  limited: "border border-[#48C78E]/40 bg-[#10251D]/92 text-[#8EF0B7] shadow-[inset_0_1px_0_rgba(255,255,255,0.07),0_0_18px_rgba(72,199,142,0.10)]",
+  dark: "border border-[#2B5360]/80 bg-[#071114]/95 text-[#A8B4B7] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]",
 };
 
 const legacyBadgeLabels: Record<string, string> = {
@@ -103,7 +103,7 @@ export function ProductCard({ product, onQuickView }: ProductCardProps) {
       onClick={() => onQuickView(product)}
     >
       {badgeLabel && (
-        <div className={`absolute right-3 top-3 z-20 ${badgeVariantClasses[badgeVariant] ?? badgeVariantClasses.top} rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide shadow-lg`}>
+        <div className={`absolute right-3 top-3 z-20 ${badgeVariantClasses[badgeVariant] ?? badgeVariantClasses.top} rounded-full px-2.5 py-0.5 text-[9px] font-black uppercase tracking-[0.14em] backdrop-blur-md`}>
           {badgeLabel}
         </div>
       )}

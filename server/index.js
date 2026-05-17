@@ -156,12 +156,18 @@ function verifyTelegramLoginData(loginData, botToken) {
 }
 
 function normalizeProduct(input, existing = {}) {
+  const parseAmountFromLabel = (label) => {
+    const normalized = String(label ?? "").trim().toLowerCase().replace(",", ".");
+    const value = Number.parseFloat(normalized);
+    if (!Number.isFinite(value)) return 0;
+    return normalized.includes("kg") ? value * 1000 : value;
+  };
   const pricingOptions = Array.isArray(input.pricingOptions)
     ? input.pricingOptions.map((option) => ({
-        amount: Number(option.amount),
+        amount: Number(option.amount) > 0 ? Number(option.amount) : parseAmountFromLabel(option.label),
         label: String(option.label ?? ""),
         price: Number(option.price),
-      })).filter((option) => option.label && Number.isFinite(option.amount) && Number.isFinite(option.price))
+      })).filter((option) => option.label && Number.isFinite(option.amount) && option.amount > 0 && Number.isFinite(option.price))
     : existing.pricingOptions ?? [];
 
   const firstPrice = pricingOptions[0]?.price ?? Number(input.price ?? existing.price ?? 0);
