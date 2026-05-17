@@ -400,7 +400,7 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen overflow-hidden bg-[#020405] px-1.5 py-2 sm:px-5 sm:py-6"
+      className="relative h-[100dvh] w-[100dvw] overflow-hidden bg-[#020405]"
       style={{ fontFamily: "'Inter', sans-serif" }}
     >
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(115deg,rgba(111,211,247,0.08),transparent_38%),linear-gradient(165deg,transparent_54%,rgba(244,201,93,0.08))]" />
@@ -462,7 +462,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      <main className="app-shell relative mx-auto h-[calc(100vh-16px)] w-full max-w-[1008px] overflow-hidden rounded-[24px] border border-[#2B5360]/55 bg-[#05080A] shadow-[0_28px_90px_rgba(0,0,0,0.62),inset_0_1px_0_rgba(255,255,255,0.07)] sm:h-[min(760px,calc(100vh-48px))] sm:rounded-[34px]">
+      <main className="app-shell relative z-10 h-[100dvh] w-full overflow-hidden bg-[#05080A] shadow-[inset_0_1px_0_rgba(255,255,255,0.07)]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(111,211,247,0.11),transparent_30%),linear-gradient(90deg,rgba(5,8,10,0.98),rgba(11,25,30,0.72))]" />
         <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,#6FD3F7_1px,transparent_0)] [background-size:24px_24px]" />
 
@@ -476,7 +476,7 @@ export default function App() {
           onLogout={handleLogout}
         />
 
-        <div className={`relative z-10 h-full app-content-scroll ${page === "home" ? "overflow-hidden" : "overflow-y-auto"}`}>
+        <div className={`relative z-10 h-full min-h-0 app-content-scroll ${page === "home" ? "overflow-hidden" : "overflow-y-auto"}`}>
           {page === "home" && (
             <HomePage
               products={products}
