@@ -2,7 +2,7 @@ import { X, ShoppingCart, Zap, MessageCircle, Minus, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { Product, getProductOption, getProductOptions } from "./ProductCard";
+import { Product, badgeVariantClasses, getBadgeLabel, getBadgeVariant, getProductOption, getProductOptions } from "./ProductCard";
 
 const categoryLabels: Record<string, string> = {
   Classic: "Classico",
@@ -46,6 +46,8 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
   const discount = product.originalPrice
     ? Math.round((1 - product.price / product.originalPrice) * 100)
     : 0;
+  const badgeLabel = getBadgeLabel(product);
+  const badgeVariant = getBadgeVariant(product);
 
   return (
     <AnimatePresence>
@@ -88,11 +90,11 @@ export function QuickViewModal({ product, onClose, onAddToCart }: QuickViewModal
                       className="w-full h-full object-cover"
                     />
                   )}
-                  {product.badge && (
-                    <div className={`absolute top-4 left-4 px-3 py-1 rounded-lg text-xs font-bold ${
-                      product.badge === "HOT" ? "bg-[#6FD3F7] text-[#071114]" : product.badge === "SALE" ? "bg-[#48C78E] text-[#071114]" : "bg-[#D8FF7A] text-[#071114]"
+                  {badgeLabel && (
+                    <div className={`absolute top-4 left-4 px-3 py-1 rounded-lg text-xs font-bold uppercase ${
+                      badgeVariantClasses[badgeVariant] ?? badgeVariantClasses.top
                     }`}>
-                      {product.badge === "NEW" ? "NUOVO" : product.badge === "SALE" ? "OFFERTA" : "TOP"}
+                      {badgeLabel}
                     </div>
                   )}
                   {discount > 0 && (

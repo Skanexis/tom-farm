@@ -12,7 +12,8 @@ export interface Product {
   photoUrl?: string;
   videoUrl?: string;
   category: string;
-  badge?: "NEW" | "HOT" | "SALE";
+  badge?: string;
+  badgeVariant?: "new" | "top" | "sale" | "premium" | "limited" | "dark";
   stock: number;
   description: string;
   pricingOptions?: ProductPricingOption[];
@@ -52,6 +53,37 @@ const categoryLabels: Record<string, string> = {
   Vape: "Vape",
 };
 
+export const badgeVariantClasses: Record<string, string> = {
+  new: "bg-[#D8FF7A] text-[#0B1113]",
+  top: "bg-[#6FD3F7] text-[#071114]",
+  sale: "bg-[#F4C95D] text-[#171008]",
+  premium: "bg-[#BF5AF2] text-white",
+  limited: "bg-[#48C78E] text-[#071114]",
+  dark: "border border-[#6FD3F7]/40 bg-[#071114]/90 text-[#9DEBFF]",
+};
+
+const legacyBadgeLabels: Record<string, string> = {
+  NEW: "NUOVO",
+  HOT: "TOP",
+  SALE: "OFFERTA",
+};
+
+const legacyBadgeVariants: Record<string, Product["badgeVariant"]> = {
+  NEW: "new",
+  HOT: "top",
+  SALE: "sale",
+};
+
+export function getBadgeLabel(product: Product): string {
+  const badge = String(product.badge ?? "").trim();
+  return legacyBadgeLabels[badge] ?? badge;
+}
+
+export function getBadgeVariant(product: Product): string {
+  const badge = String(product.badge ?? "").trim();
+  return product.badgeVariant ?? legacyBadgeVariants[badge] ?? "top";
+}
+
 interface ProductCardProps {
   product: Product;
   onAddToCart: (product: Product, grams: number) => void;
@@ -61,16 +93,8 @@ interface ProductCardProps {
 export function ProductCard({ product, onQuickView }: ProductCardProps) {
   const options = getProductOptions(product);
   const [amount, setAmount] = useState(options[0]?.amount ?? 1);
-  const badgeColors = {
-    NEW: "bg-[#D8FF7A] text-[#0B1113]",
-    HOT: "bg-[#6FD3F7] text-[#071114]",
-    SALE: "bg-[#F4C95D] text-[#171008]",
-  };
-  const badgeLabels = {
-    NEW: "NUOVO",
-    HOT: "TOP",
-    SALE: "OFFERTA",
-  };
+  const badgeLabel = getBadgeLabel(product);
+  const badgeVariant = getBadgeVariant(product);
   return (
     <motion.div
       whileHover={{ y: -3 }}
@@ -78,14 +102,14 @@ export function ProductCard({ product, onQuickView }: ProductCardProps) {
       className="relative min-h-[250px] overflow-hidden cursor-pointer group rounded-[14px] border border-[#2B5360]/55 bg-[#111518] shadow-[0_14px_44px_rgba(0,0,0,0.30),inset_0_1px_0_rgba(255,255,255,0.06)] transition-all duration-300 hover:border-[#6FD3F7]/65 sm:min-h-[205px] sm:rounded-[16px]"
       onClick={() => onQuickView(product)}
     >
-      {product.badge && (
-        <div className={`absolute right-3 top-3 z-20 ${badgeColors[product.badge]} rounded-full px-2.5 py-0.5 text-[10px] font-black tracking-wide shadow-lg`}>
-          {badgeLabels[product.badge]}
+      {badgeLabel && (
+        <div className={`absolute right-3 top-3 z-20 ${badgeVariantClasses[badgeVariant] ?? badgeVariantClasses.top} rounded-full px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide shadow-lg`}>
+          {badgeLabel}
         </div>
       )}
 
       {product.stock <= 3 && product.stock > 0 && (
-        <div className={`absolute right-3 z-20 flex items-center gap-1 rounded-full border border-[#F4C95D]/35 bg-[#F4C95D]/15 px-2 py-0.5 text-[10px] font-black text-[#F7D77D] ${product.badge ? "top-9" : "top-3"}`}>
+        <div className={`absolute right-3 z-20 flex items-center gap-1 rounded-full border border-[#F4C95D]/35 bg-[#F4C95D]/15 px-2 py-0.5 text-[10px] font-black text-[#F7D77D] ${badgeLabel ? "top-9" : "top-3"}`}>
           <Zap size={9} />
           {product.stock} rimasti
         </div>

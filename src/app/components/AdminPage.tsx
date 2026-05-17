@@ -1,6 +1,7 @@
 import { CheckCircle, Image, Plus, Save, Search, Trash2, Upload, Video } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import type { AppUser, ContactItem } from "../App";
+import { badgeVariantClasses } from "./ProductCard";
 import type { Product, ProductPricingOption } from "./ProductCard";
 
 interface AdminPageProps {
@@ -28,6 +29,14 @@ const emptyProduct: Product = {
 
 const inputClass = "w-full rounded-xl border border-white/10 bg-white/7 px-3 py-2 text-xs font-bold text-[#F5F7EE] outline-none transition focus:border-[#6FD3F7]/60";
 const labelClass = "mb-1.5 block text-[9px] font-black uppercase tracking-[0.18em] text-[#8EA9AF]";
+const badgePresets = [
+  { value: "top", label: "Top", sample: "TOP" },
+  { value: "new", label: "Nuovo", sample: "NUOVO" },
+  { value: "sale", label: "Offerta", sample: "OFFERTA" },
+  { value: "premium", label: "Premium", sample: "PREMIUM" },
+  { value: "limited", label: "Limitato", sample: "LIMITATO" },
+  { value: "dark", label: "Dark", sample: "CUSTOM" },
+];
 const emptyContact: ContactItem = {
   id: 0,
   title: "Nuovo contatto",
@@ -345,14 +354,40 @@ export function AdminPage({ user, products, contacts, onLoginClick, onProductsCh
               </select>
             </label>
             <label>
-              <span className={labelClass}>Etichetta</span>
-              <select className={inputClass} value={draft.badge ?? ""} onChange={(event) => updateDraft({ badge: event.target.value as Product["badge"] || undefined })}>
-                <option value="">Nessuna</option>
-                <option value="NEW">NEW</option>
-                <option value="HOT">HOT</option>
-                <option value="SALE">SALE</option>
+              <span className={labelClass}>Testo etichetta</span>
+              <input
+                className={inputClass}
+                value={draft.badge ?? ""}
+                onChange={(event) => updateDraft({ badge: event.target.value })}
+                placeholder="TOP, NUOVO, 120U..."
+              />
+            </label>
+            <label>
+              <span className={labelClass}>Stile etichetta</span>
+              <select
+                className={inputClass}
+                value={draft.badgeVariant ?? "top"}
+                onChange={(event) => updateDraft({ badgeVariant: event.target.value as Product["badgeVariant"] })}
+              >
+                {badgePresets.map((preset) => (
+                  <option key={preset.value} value={preset.value}>{preset.label}</option>
+                ))}
               </select>
             </label>
+            <div className="col-span-2 flex flex-wrap gap-1.5">
+              {badgePresets.map((preset) => (
+                <button
+                  key={preset.value}
+                  type="button"
+                  onClick={() => updateDraft({ badgeVariant: preset.value as Product["badgeVariant"] })}
+                  className={`rounded-full px-2.5 py-1 text-[9px] font-black uppercase tracking-wide transition ${
+                    badgeVariantClasses[preset.value]
+                  } ${draft.badgeVariant === preset.value ? "ring-2 ring-white/45" : "opacity-70 hover:opacity-100"}`}
+                >
+                  {draft.badge || preset.sample}
+                </button>
+              ))}
+            </div>
             <label>
               <span className={labelClass}>Disponibilita</span>
               <input className={inputClass} type="number" value={draft.stock} onChange={(event) => updateDraft({ stock: Number(event.target.value) })} />

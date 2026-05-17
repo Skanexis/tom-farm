@@ -35,7 +35,7 @@ async function ensureDb() {
   } catch {
     const products = JSON.parse(await fs.readFile(seedPath, "utf8"));
     const contacts = JSON.parse(await fs.readFile(contactsSeedPath, "utf8"));
-    await writeDb({ products, contacts, users: [] });
+    await writeDb({ products, contacts, users: [], orders: [] });
   }
 }
 
@@ -44,6 +44,10 @@ async function readDb() {
   const db = JSON.parse(await fs.readFile(dbPath, "utf8"));
   if (!Array.isArray(db.contacts)) {
     db.contacts = JSON.parse(await fs.readFile(contactsSeedPath, "utf8"));
+    await writeDb(db);
+  }
+  if (!Array.isArray(db.orders)) {
+    db.orders = [];
     await writeDb(db);
   }
   return db;
@@ -69,11 +73,12 @@ async function upsertTelegramUser(telegramUser) {
   const name = [telegramUser.first_name, telegramUser.last_name].filter(Boolean).join(" ") || telegramUser.username || `User ${id}`;
   const existing = db.users.find((user) => String(user.id) === id);
   const ids = await readAdminIds();
+  const photoUrl = telegramUser.photo_url ?? telegramUser.photoUrl ?? existing?.photoUrl ?? "";
   const user = {
     id,
     name,
     username: telegramUser.username ?? existing?.username ?? "",
-    photoUrl: telegramUser.photo_url ?? existing?.photoUrl ?? "",
+    photoUrl,
     isAdmin: ids.includes(id) || existing?.isAdmin || false,
     updatedAt: new Date().toISOString(),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
@@ -170,6 +175,7 @@ function normalizeProduct(input, existing = {}) {
     videoUrl: String(input.videoUrl ?? existing.videoUrl ?? ""),
     category: String(input.category ?? existing.category ?? "Hash"),
     badge: input.badge ? String(input.badge) : "",
+    badgeVariant: String(input.badgeVariant ?? existing.badgeVariant ?? ""),
     stock: Number(input.stock ?? existing.stock ?? 0),
     description: String(input.description ?? existing.description ?? ""),
     pricingOptions,
@@ -185,6 +191,83 @@ function normalizeContact(input, existing = {}) {
     type: String(input.type ?? existing.type ?? "telegram"),
     accent: String(input.accent ?? existing.accent ?? "#6FD3F7"),
   };
+}
+
+function normalizeOrderItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map((item) => {
+    const product = item.product ?? {};
+    const grams = Number(item.grams ?? 0);
+    const quantity = Number(item.quantity ?? 0);
+    const unitPrice = Number(item.unitPrice ?? 0);
+    return {
+      productId: Number(product.id ?? item.productId ?? 0),
+      name: String(product.name ?? item.name ?? ""),
+      category: String(product.category ?? item.category ?? ""),
+      grams,
+      quantity,
+      unitPrice,
+      lineTotal: unitPrice * quantity,
+    };
+  }).filter((item) => item.productId && item.name && item.grams > 0 && item.quantity > 0 && Number.isFinite(item.unitPrice));
+}
+
+function publicOrder(order) {
+  return {
+    id: order.id,
+    userId: order.userId,
+    status: order.status,
+    total: order.total,
+    service: order.service,
+    items: order.items,
+    createdAt: order.createdAt,
+  };
+}
+
+function formatItalianDateTime(date) {
+  return new Intl.DateTimeFormat("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Rome",
+  }).format(date);
+}
+
+function formatCustomer(user) {
+  return user.username ? `@${user.username}` : `${user.name} (ID: ${user.id})`;
+}
+
+function formatOrderNotification(order, user) {
+  const lines = [
+    `Nuovo ordine ${order.id}`,
+    `Cliente: ${formatCustomer(user)}`,
+    `Servizio: ${order.service}`,
+    `Ora: ${formatItalianDateTime(new Date(order.createdAt))}`,
+    "",
+    "Prodotti:",
+    ...order.items.map((item) => `- ${item.name} | ${item.grams}g x ${item.quantity} | ${item.lineTotal.toFixed(2)}€`),
+    "",
+    `Totale: ${order.total.toFixed(2)}€`,
+  ];
+
+  return lines.join("\n");
+}
+
+async function notifyAdminsAboutOrder(order, user) {
+  const adminIds = await readAdminIds();
+  if (!adminIds.length) return;
+
+  const message = formatOrderNotification(order, user);
+  await Promise.all(adminIds.map((adminId) => sendTelegramMessage(adminId, message, {
+    reply_markup: {
+      inline_keyboard: [[
+        { text: "Accetta", callback_data: `order:accepted:${order.id}` },
+        { text: "Rifiuta", callback_data: `order:rejected:${order.id}` },
+      ]],
+    },
+  })));
 }
 
 function cleanupAuthSessions() {
@@ -211,11 +294,57 @@ async function telegramApi(method, body = {}) {
   return data.result;
 }
 
-async function sendTelegramMessage(chatId, text) {
+async function downloadTelegramProfilePhoto(userId) {
+  if (!process.env.TELEGRAM_BOT_TOKEN) return "";
+
   try {
-    await telegramApi("sendMessage", { chat_id: chatId, text });
+    const photos = await telegramApi("getUserProfilePhotos", { user_id: userId, limit: 1 });
+    const photoSizes = photos?.photos?.[0];
+    const bestPhoto = photoSizes?.[photoSizes.length - 1];
+    if (!bestPhoto?.file_id) return "";
+
+    const file = await telegramApi("getFile", { file_id: bestPhoto.file_id });
+    if (!file?.file_path) return "";
+
+    const response = await fetch(`https://api.telegram.org/file/bot${process.env.TELEGRAM_BOT_TOKEN}/${file.file_path}`);
+    if (!response.ok) return "";
+
+    const ext = path.extname(file.file_path) || ".jpg";
+    const telegramUploadsDir = path.join(uploadsDir, "telegram");
+    await fs.mkdir(telegramUploadsDir, { recursive: true });
+    const filename = `${userId}${ext}`;
+    const filepath = path.join(telegramUploadsDir, filename);
+    const buffer = Buffer.from(await response.arrayBuffer());
+    await fs.writeFile(filepath, buffer);
+
+    return `/uploads/telegram/${filename}`;
+  } catch (error) {
+    console.warn("Telegram profile photo download failed:", error.message);
+    return "";
+  }
+}
+
+async function sendTelegramMessage(chatId, text, options = {}) {
+  try {
+    await telegramApi("sendMessage", { chat_id: chatId, text, ...options });
   } catch (error) {
     console.warn("Telegram sendMessage failed:", error.message);
+  }
+}
+
+async function answerTelegramCallback(callbackQueryId, text) {
+  try {
+    await telegramApi("answerCallbackQuery", { callback_query_id: callbackQueryId, text });
+  } catch (error) {
+    console.warn("Telegram answerCallbackQuery failed:", error.message);
+  }
+}
+
+async function editTelegramMessage(chatId, messageId, text) {
+  try {
+    await telegramApi("editMessageText", { chat_id: chatId, message_id: messageId, text });
+  } catch (error) {
+    console.warn("Telegram editMessageText failed:", error.message);
   }
 }
 
@@ -223,7 +352,7 @@ async function handleTelegramStart(from, chatId, payload) {
   if (!from?.id) return;
 
   if (!payload?.startsWith("login_")) {
-    await sendTelegramMessage(chatId, "Откройте вход на сайте Tom Farm и нажмите кнопку Telegram.");
+    await sendTelegramMessage(chatId, "Apri il login sul sito Tom Farm e premi il pulsante Telegram.");
     return;
   }
 
@@ -232,23 +361,60 @@ async function handleTelegramStart(from, chatId, payload) {
   const sessionId = sessionByCode.get(code);
   const session = sessionId ? authSessions.get(sessionId) : null;
   if (!session) {
-    await sendTelegramMessage(chatId, "Ссылка входа устарела. Откройте вход на сайте еще раз.");
+    await sendTelegramMessage(chatId, "Il link di accesso e scaduto. Apri di nuovo il login sul sito.");
     return;
   }
 
-  const user = await upsertTelegramUser(from);
+  const photoUrl = await downloadTelegramProfilePhoto(from.id);
+  const user = await upsertTelegramUser({ ...from, photoUrl });
   session.user = publicUser(user);
   authSessions.set(sessionId, session);
-  await sendTelegramMessage(chatId, "Готово. Вернитесь на сайт Tom Farm, вход уже подтвержден.");
+  await sendTelegramMessage(chatId, "Fatto. Torna sul sito Tom Farm, l'accesso e confermato.");
 }
 
 async function processTelegramUpdate(update) {
+  if (update.callback_query) {
+    await handleTelegramCallback(update.callback_query);
+    return;
+  }
+
   const message = update.message;
   const text = message?.text ?? "";
   if (!message?.from || !text.startsWith("/start")) return;
 
   const [, payload = ""] = text.trim().split(/\s+/, 2);
   await handleTelegramStart(message.from, message.chat.id, payload);
+}
+
+async function handleTelegramCallback(callbackQuery) {
+  const data = callbackQuery.data ?? "";
+  const [kind, status, ...orderIdParts] = data.split(":");
+  if (kind !== "order" || !["accepted", "rejected"].includes(status)) return;
+
+  const adminIds = await readAdminIds();
+  const fromId = String(callbackQuery.from?.id ?? "");
+  if (!adminIds.includes(fromId)) {
+    await answerTelegramCallback(callbackQuery.id, "Non autorizzato");
+    return;
+  }
+
+  const orderId = orderIdParts.join(":");
+  const db = await readDb();
+  const order = db.orders.find((item) => item.id === orderId);
+  if (!order) {
+    await answerTelegramCallback(callbackQuery.id, "Ordine non trovato");
+    return;
+  }
+
+  order.status = status;
+  order.updatedAt = new Date().toISOString();
+  order.reviewedBy = fromId;
+  await writeDb(db);
+
+  const statusLabel = status === "accepted" ? "accettato" : "rifiutato";
+  await answerTelegramCallback(callbackQuery.id, `Ordine ${statusLabel}`);
+  const originalText = callbackQuery.message?.text ?? `Nuovo ordine ${order.id}`;
+  await editTelegramMessage(callbackQuery.message.chat.id, callbackQuery.message.message_id, `${originalText}\n\nStato: ${statusLabel.toUpperCase()}`);
 }
 
 async function pollTelegramUpdates() {
@@ -258,7 +424,7 @@ async function pollTelegramUpdates() {
     const updates = await telegramApi("getUpdates", {
       offset: telegramPollingOffset ? telegramPollingOffset + 1 : undefined,
       timeout: 0,
-      allowed_updates: ["message"],
+      allowed_updates: ["message", "callback_query"],
     });
 
     for (const update of updates ?? []) {
@@ -398,6 +564,54 @@ app.delete("/api/products/:id", requireAdmin, async (req, res) => {
   db.products = db.products.filter((product) => String(product.id) !== req.params.id);
   await writeDb(db);
   res.status(204).end();
+});
+
+app.get("/api/orders", async (req, res) => {
+  const userId = req.header("x-user-id");
+  if (!userId) return res.status(401).json({ error: "Accesso richiesto" });
+
+  const db = await readDb();
+  const user = db.users.find((item) => String(item.id) === String(userId));
+  if (!user) return res.status(401).json({ error: "Utente non trovato" });
+
+  const orders = db.orders
+    .filter((order) => String(order.userId) === String(userId))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+    .map(publicOrder);
+  res.json(orders);
+});
+
+app.post("/api/orders", async (req, res) => {
+  const userId = req.header("x-user-id");
+  if (!userId) return res.status(401).json({ error: "Accesso richiesto" });
+
+  const db = await readDb();
+  const user = db.users.find((item) => String(item.id) === String(userId));
+  if (!user) return res.status(401).json({ error: "Utente non trovato" });
+
+  const items = normalizeOrderItems(req.body?.items);
+  if (!items.length) return res.status(400).json({ error: "Ordine vuoto" });
+  const service = String(req.body?.service ?? "").trim();
+  const allowedServices = new Set(["Meet Up", "Delivery", "Ship"]);
+  if (!allowedServices.has(service)) return res.status(400).json({ error: "Servizio richiesto" });
+
+  const total = items.reduce((sum, item) => sum + item.lineTotal, 0);
+  const nextId = db.orders.reduce((max, order) => Math.max(max, Number(order.sequence ?? 0)), 0) + 1;
+  const order = {
+    sequence: nextId,
+    id: `Ordine#${nextId}`,
+    userId: String(userId),
+    status: "pending",
+    service,
+    total,
+    items,
+    createdAt: new Date().toISOString(),
+  };
+
+  db.orders.push(order);
+  await writeDb(db);
+  await notifyAdminsAboutOrder(order, user);
+  res.status(201).json(publicOrder(order));
 });
 
 app.post("/api/products/:id/media", requireAdmin, upload.fields([{ name: "photo", maxCount: 1 }, { name: "video", maxCount: 1 }]), async (req, res) => {

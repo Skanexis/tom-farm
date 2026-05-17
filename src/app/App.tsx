@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import { Header } from "./components/Header";
 import { HomePage } from "./components/HomePage";
 import { ShopPage } from "./components/ShopPage";
-import { CartDrawer, CartItem } from "./components/CartDrawer";
+import { CartDrawer, CartItem, CheckoutService } from "./components/CartDrawer";
 import { QuickViewModal } from "./components/QuickViewModal";
 import { ProfilePage } from "./components/ProfilePage";
 import { Product } from "./components/ProductCard";
@@ -12,6 +12,7 @@ import { AdminPage } from "./components/AdminPage";
 import { ContactsPage } from "./components/ContactsPage";
 import initialProducts from "../../data/initial-products.json";
 import initialContacts from "../../data/initial-contacts.json";
+import tomFarmLogo from "../../upload/photo_2026-05-15_19-34-45.jpg";
 
 export interface AppUser {
   id: string;
@@ -84,7 +85,7 @@ function TelegramLoginModal({
         if (cancelled) return;
         setStartUrl(session.startUrl);
         setBotUsername(session.botUsername);
-        setStatusText("Откройте бота и нажмите Start");
+        setStatusText("Apri il bot e premi Start");
         setLoading(false);
 
         intervalId = setInterval(async () => {
@@ -99,7 +100,7 @@ function TelegramLoginModal({
             }
           } catch {
             if (intervalId) clearInterval(intervalId);
-            setLoginError("Сессия входа устарела. Закройте окно и попробуйте еще раз.");
+            setLoginError("La sessione di accesso e scaduta. Chiudi la finestra e riprova.");
           }
         }, 1500);
       } catch {
@@ -167,9 +168,9 @@ function TelegramLoginModal({
             </svg>
           </div>
 
-          <h2 className="text-white font-black text-2xl mb-2">Вход через Telegram</h2>
+          <h2 className="text-white font-black text-2xl mb-2">Accesso Telegram</h2>
           <p className="text-[#A1A1AA] text-sm mb-6 leading-relaxed">
-            Нажмите кнопку, отправьте боту /start и вернитесь на сайт.
+            Premi il pulsante, invia /start al bot e torna sul sito.
           </p>
 
           {startUrl ? (
@@ -179,7 +180,7 @@ function TelegramLoginModal({
               rel="noreferrer"
               className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#229ED9] py-4 font-bold text-white transition-all hover:bg-[#1d8bbf]"
             >
-              Открыть @{botUsername}
+              Apri @{botUsername}
             </a>
           ) : (
             <button
@@ -265,6 +266,7 @@ function CheckoutSuccessModal({ onClose }: { onClose: () => void }) {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  const [preloading, setPreloading] = useState(true);
   const [page, setPage] = useState("home");
   const [products, setProducts] = useState<Product[]>(initialProducts as Product[]);
   const [contacts, setContacts] = useState<ContactItem[]>(initialContacts as ContactItem[]);
@@ -279,6 +281,11 @@ export default function App() {
   const [checkoutSuccess, setCheckoutSuccess] = useState(false);
 
   const cartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPreloading(false), 3000);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   const loadProducts = useCallback(async () => {
     try {
@@ -309,6 +316,21 @@ export default function App() {
     localStorage.setItem("tomfarm_user", JSON.stringify(nextUser));
     setUser(nextUser);
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+
+    fetch(`/api/users/${user.id}`)
+      .then((response) => {
+        if (!response.ok) throw new Error("User request failed");
+        return response.json();
+      })
+      .then((freshUser) => {
+        localStorage.setItem("tomfarm_user", JSON.stringify(freshUser));
+        setUser(freshUser);
+      })
+      .catch(() => {});
+  }, [user?.id]);
 
   const handleLogout = useCallback(() => {
     localStorage.removeItem("tomfarm_user");
@@ -341,15 +363,34 @@ export default function App() {
     setCart((prev) => prev.filter((i) => !(i.product.id === productId && i.grams === grams)));
   }, []);
 
-  const handleCheckout = () => {
+  const handleCheckout = async (service: CheckoutService) => {
     if (!user) {
       setLoginOpen(true);
       return;
     }
 
-    setCartOpen(false);
-    setCart([]);
-    setCheckoutSuccess(true);
+    const response = await fetch("/api/orders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-user-id": user.id },
+      body: JSON.stringify({
+        service,
+        items: cart.map((item) => {
+          const option = item.product.pricingOptions?.find((entry) => entry.amount === item.grams);
+          return {
+            product: item.product,
+            grams: item.grams,
+            quantity: item.quantity,
+            unitPrice: option?.price ?? item.product.price * item.grams,
+          };
+        }),
+      }),
+    });
+
+    if (response.ok) {
+      setCartOpen(false);
+      setCart([]);
+      setCheckoutSuccess(true);
+    }
   };
 
   const navigate = (p: string) => {
@@ -364,6 +405,62 @@ export default function App() {
     >
       <div className="pointer-events-none fixed inset-0 bg-[linear-gradient(115deg,rgba(111,211,247,0.08),transparent_38%),linear-gradient(165deg,transparent_54%,rgba(244,201,93,0.08))]" />
       <div className="pointer-events-none fixed inset-0 opacity-[0.06] [background-image:linear-gradient(108deg,#6FD3F7_1px,transparent_1px)] [background-size:58px_58px]" />
+
+      <AnimatePresence>
+        {preloading && (
+          <motion.div
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.55, ease: "easeOut" }}
+            className="fixed inset-0 z-[100] grid place-items-center bg-[#020405]"
+          >
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_42%,rgba(111,211,247,0.18),transparent_34%),linear-gradient(165deg,transparent_54%,rgba(216,255,122,0.08))]" />
+            <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,#6FD3F7_1px,transparent_0)] [background-size:24px_24px]" />
+            <motion.div
+              initial={{ opacity: 0, y: 14, scale: 0.94 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="relative flex flex-col items-center"
+            >
+              <motion.div
+                animate={{ scale: [1, 1.04, 1], rotate: [0, 1.5, 0] }}
+                transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                className="relative"
+              >
+                <div className="absolute -inset-5 rounded-full border border-[#6FD3F7]/20" />
+                <div className="absolute -inset-10 rounded-full bg-[#6FD3F7]/10 blur-3xl" />
+                <img
+                  src={tomFarmLogo}
+                  alt="Tom Farm logo"
+                  className="relative h-28 w-28 rounded-full border border-[#6FD3F7]/45 object-cover shadow-[0_24px_70px_rgba(0,0,0,0.45),0_0_42px_rgba(111,211,247,0.18)] sm:h-[136px] sm:w-[136px]"
+                />
+              </motion.div>
+              <motion.p
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25, duration: 0.45 }}
+                className="mt-6 text-[10px] font-black uppercase tracking-[0.34em] text-[#9DEBFF]"
+              >
+                Listino
+              </motion.p>
+              <motion.h1
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.38, duration: 0.45 }}
+                className="mt-2 text-4xl font-black uppercase tracking-[0.08em] text-[#F5F7EE]"
+              >
+                Tom Farm
+              </motion.h1>
+              <motion.div
+                initial={{ width: 0 }}
+                animate={{ width: 160 }}
+                transition={{ duration: 2.55, ease: "easeInOut" }}
+                className="mt-7 h-1 rounded-full bg-[#D8FF7A] shadow-[0_0_22px_rgba(216,255,122,0.28)]"
+              />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="app-shell relative mx-auto h-[calc(100vh-16px)] w-full max-w-[1008px] overflow-hidden rounded-[24px] border border-[#2B5360]/55 bg-[#05080A] shadow-[0_28px_90px_rgba(0,0,0,0.62),inset_0_1px_0_rgba(255,255,255,0.07)] sm:h-[min(760px,calc(100vh-48px))] sm:rounded-[34px]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_72%_28%,rgba(111,211,247,0.11),transparent_30%),linear-gradient(90deg,rgba(5,8,10,0.98),rgba(11,25,30,0.72))]" />

@@ -1,5 +1,6 @@
 import { X, Trash2, Plus, Minus, ReceiptText, ArrowRight } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useState } from "react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Product, getProductOption } from "./ProductCard";
 
@@ -9,18 +10,22 @@ export interface CartItem {
   quantity: number;
 }
 
+export type CheckoutService = "Meet Up" | "Delivery" | "Ship";
+
 interface CartDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   items: CartItem[];
   onUpdateQuantity: (productId: number, grams: number, delta: number) => void;
   onRemove: (productId: number, grams: number) => void;
-  onCheckout: () => void;
+  onCheckout: (service: CheckoutService) => void;
 }
 
 export function CartDrawer({ isOpen, onClose, items, onUpdateQuantity, onRemove, onCheckout }: CartDrawerProps) {
   const total = items.reduce((sum, item) => sum + getProductOption(item.product, item.grams).price * item.quantity, 0);
   const totalPacks = items.reduce((sum, item) => sum + item.quantity, 0);
+  const [service, setService] = useState<CheckoutService>("Meet Up");
+  const services: CheckoutService[] = ["Meet Up", "Delivery", "Ship"];
 
   return (
     <AnimatePresence>
@@ -174,6 +179,24 @@ export function CartDrawer({ isOpen, onClose, items, onUpdateQuantity, onRemove,
             {items.length > 0 && (
               <div className="px-6 py-5 border-t border-[#2B5360]/55 space-y-4 bg-[#071114]">
                 <div className="space-y-2 rounded-2xl border border-[#2B5360]/55 bg-white/7 p-4">
+                  <div>
+                    <p className="mb-2 text-[10px] font-black uppercase tracking-[0.18em] text-[#8EA9AF]">Servizio</p>
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {services.map((item) => (
+                        <button
+                          key={item}
+                          onClick={() => setService(item)}
+                          className={`h-9 rounded-xl text-[11px] font-black transition-all ${
+                            service === item
+                              ? "bg-[#D8FF7A] text-[#071114]"
+                              : "border border-white/10 bg-white/7 text-[#A8B4B7] hover:border-[#6FD3F7]/45 hover:text-[#F5F7EE]"
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-bold text-[#8EA9AF]">Pacchi totali</span>
                     <span className="font-black">{totalPacks}</span>
@@ -188,7 +211,7 @@ export function CartDrawer({ isOpen, onClose, items, onUpdateQuantity, onRemove,
                   </div>
                 </div>
                 <button
-                  onClick={onCheckout}
+                  onClick={() => onCheckout(service)}
                   className="w-full flex items-center justify-center gap-2 py-4 bg-[#6FD3F7] rounded-2xl text-[#071114] font-black hover:bg-[#9DEBFF] active:scale-[0.98] transition-all duration-200"
                 >
                   Invia ricevuta

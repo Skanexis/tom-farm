@@ -1,35 +1,56 @@
-import { Package, Bell, LogOut, ChevronRight, ShoppingBag, Clock, CheckCircle, BadgeCheck, Zap } from "lucide-react";
+import { Package, Bell, LogOut, ChevronRight, ShoppingBag, Clock, CheckCircle, BadgeCheck, Zap, XCircle } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useMemo, useState } from "react";
 
 interface Order {
   id: string;
-  date: string;
-  status: "pending" | "completed" | "shipped";
+  createdAt: string;
+  status: "pending" | "accepted" | "rejected" | "completed" | "shipped";
   total: number;
-  items: number;
+  service?: string;
+  items: Array<{
+    productId: number;
+    name: string;
+    grams: number;
+    quantity: number;
+    unitPrice: number;
+    lineTotal: number;
+  }>;
 }
 
 interface ProfilePageProps {
-  user: { name: string; id: string } | null;
+  user: { name: string; id: string; photoUrl?: string } | null;
   onLoginClick: () => void;
   onLogout: () => void;
   onNavigate: (page: string) => void;
 }
 
-const mockOrders: Order[] = [
-  { id: "#TOM-4821", date: "14 maggio 2026", status: "shipped", total: 30, items: 1 },
-  { id: "#TOM-4756", date: "10 maggio 2026", status: "completed", total: 50, items: 1 },
-  { id: "#TOM-4621", date: "28 aprile 2026", status: "completed", total: 20, items: 1 },
-  { id: "#TOM-4480", date: "15 aprile 2026", status: "completed", total: 100, items: 1 },
-];
-
 const statusConfig = {
   pending: { label: "In attesa", color: "text-[#FF9500]", bg: "bg-[#FF9500]/15", icon: <Clock size={12} /> },
+  accepted: { label: "Accettato", color: "text-[#30D158]", bg: "bg-[#30D158]/15", icon: <CheckCircle size={12} /> },
+  rejected: { label: "Rifiutato", color: "text-[#FF453A]", bg: "bg-[#FF453A]/15", icon: <XCircle size={12} /> },
   shipped: { label: "Spedito", color: "text-[#229ED9]", bg: "bg-[#229ED9]/15", icon: <Package size={12} /> },
   completed: { label: "Completato", color: "text-[#30D158]", bg: "bg-[#30D158]/15", icon: <CheckCircle size={12} /> },
 };
 
 export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: ProfilePageProps) {
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+
+    setOrdersLoading(true);
+    fetch("/api/orders", { headers: { "x-user-id": user.id } })
+      .then((response) => {
+        if (!response.ok) throw new Error("Orders request failed");
+        return response.json();
+      })
+      .then((nextOrders) => setOrders(nextOrders))
+      .catch(() => setOrders([]))
+      .finally(() => setOrdersLoading(false));
+  }, [user]);
+
   if (!user) {
     return (
       <div className="min-h-full bg-transparent pt-28 pb-10 flex items-center justify-center px-6">
@@ -53,8 +74,13 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
     );
   }
 
-  const totalSpent = mockOrders.reduce((sum, o) => sum + o.total, 0);
-  const completedOrders = mockOrders.filter((o) => o.status === "completed").length;
+  const totalSpent = useMemo(() => orders.reduce((sum, order) => sum + order.total, 0), [orders]);
+  const completedOrders = useMemo(() => orders.filter((order) => order.status === "completed").length, [orders]);
+  const formatOrderDate = (date: string) => new Intl.DateTimeFormat("it-IT", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(date));
 
   return (
     <div className="min-h-full bg-transparent pt-28 pb-10">
@@ -70,8 +96,12 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
 
           <div className="relative flex flex-col sm:flex-row items-start sm:items-center gap-6">
             <div className="relative">
-              <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#6FD3F7] to-[#D8FF7A] flex items-center justify-center text-white font-black text-3xl shadow-[0_0_30px_rgba(111,211,247,0.24)]">
-                {user.name[0].toUpperCase()}
+              <div className="w-20 h-20 overflow-hidden rounded-2xl bg-gradient-to-br from-[#6FD3F7] to-[#D8FF7A] flex items-center justify-center text-white font-black text-3xl shadow-[0_0_30px_rgba(111,211,247,0.24)]">
+                {user.photoUrl ? (
+                  <img src={user.photoUrl} alt={user.name} className="h-full w-full object-cover" />
+                ) : (
+                  user.name[0].toUpperCase()
+                )}
               </div>
               <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-[#30D158] rounded-full border-2 border-[#141416] flex items-center justify-center">
                 <div className="w-2 h-2 bg-white rounded-full" />
@@ -106,7 +136,7 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
           {/* Stats */}
           <div className="relative grid grid-cols-3 gap-4 mt-8 pt-8 border-t border-white/5">
             {[
-              { label: "Ordini totali", value: mockOrders.length, icon: <ShoppingBag size={18} className="text-[#6FD3F7]" /> },
+              { label: "Ordini totali", value: orders.length, icon: <ShoppingBag size={18} className="text-[#6FD3F7]" /> },
               { label: "Completati", value: completedOrders, icon: <CheckCircle size={18} className="text-[#30D158]" /> },
               { label: "Totale speso", value: `${totalSpent.toFixed(0)}€`, icon: <Zap size={18} className="text-[#BF5AF2]" /> },
             ].map((stat) => (
@@ -132,8 +162,29 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
               Storico ordini
             </h2>
             <div className="space-y-3">
-              {mockOrders.map((order) => {
+              {ordersLoading && (
+                <div className="rounded-2xl border border-white/5 bg-[#0F0F11] p-5 text-sm font-bold text-[#A1A1AA]">
+                  Caricamento ordini...
+                </div>
+              )}
+
+              {!ordersLoading && orders.length === 0 && (
+                <div className="rounded-2xl border border-dashed border-[#2B5360]/55 bg-[#0F0F11] p-6 text-center">
+                  <ShoppingBag size={26} className="mx-auto mb-3 text-[#6FD3F7]" />
+                  <p className="font-black text-white">Nessun ordine ancora</p>
+                  <p className="mt-1 text-sm text-[#A1A1AA]">Gli ordini reali appariranno qui dopo l'invio.</p>
+                  <button
+                    onClick={() => onNavigate("shop")}
+                    className="mt-4 rounded-xl bg-[#6FD3F7] px-4 py-2 text-xs font-black text-[#071114]"
+                  >
+                    Apri catalogo
+                  </button>
+                </div>
+              )}
+
+              {!ordersLoading && orders.map((order) => {
                 const s = statusConfig[order.status];
+                const itemCount = order.items.reduce((sum, item) => sum + item.quantity, 0);
                 return (
                   <div
                     key={order.id}
@@ -145,7 +196,9 @@ export function ProfilePage({ user, onLoginClick, onLogout, onNavigate }: Profil
                       </div>
                       <div>
                         <p className="text-white font-semibold text-sm">{order.id}</p>
-                        <p className="text-[#A1A1AA] text-xs mt-0.5">{order.date} · {order.items} articolo{order.items > 1 ? "i" : ""}</p>
+                        <p className="text-[#A1A1AA] text-xs mt-0.5">
+                          {formatOrderDate(order.createdAt)} · {itemCount} articolo{itemCount > 1 ? "i" : ""}{order.service ? ` · ${order.service}` : ""}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
